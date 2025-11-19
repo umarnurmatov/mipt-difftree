@@ -56,6 +56,11 @@ int main(int argc, char* argv[])
 
     utils_init_log_file(long_opts[0].arg, LOG_DIR);
 
+    DiffTree dtree = DIFF_TREE_INIT_LIST;
+
+    diff_tree_ctor(&dtree);
+
+    diff_tree_fread(&dtree, "input.txt"); 
 
     // if(long_opts[1].is_set)
     //     err = fact_tree_fread(&dtree, long_opts[1].arg);
@@ -83,7 +88,7 @@ int main(int argc, char* argv[])
     //     }
     // }
     //
-    // fact_tree_dtor(&dtree);
+    diff_tree_dtor(&dtree);
 
     utils_end_log();
 

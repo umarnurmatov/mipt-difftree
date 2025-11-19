@@ -4,6 +4,7 @@
 
 #include "stringutils.h"
 #include "stack.h"
+#include "types.h"
 
 #define DIFF_TREE_INIT_LIST \
     {                       \
@@ -28,10 +29,12 @@ typedef enum DiffTreeErr
 
 typedef struct DiffTreeNode
 {
-    utils_str_t name;
     DiffTreeNode* left;
     DiffTreeNode* right;
     DiffTreeNode* parent;
+    
+    NodeType type;
+    NodeValue value;
 
 } DiffTreeNode;
 

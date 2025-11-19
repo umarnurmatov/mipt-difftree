@@ -7,6 +7,7 @@
 #include <stdarg.h>
 
 #include "colorutils.h"
+#include "hashutils.h"
 #include "logutils.h"
 #include "memutils.h"
 #include "ioutils.h"
@@ -16,7 +17,10 @@
 #include "logutils.h"
 #include "stack.h"
 
-#define LOG_CTG_DIFF_TREE "FACT TREE"
+#include "operators.h"
+#include "types.h"
+
+#define LOG_CTG_DIFF_TREE "DIFFTREE"
 
 #define DEFAULT_NODE_ "nothing"
 #define CHAR_ACCEPT_ 'y'
@@ -40,9 +44,7 @@
 
 #endif // _DEBUG
 
-static DiffTreeErr diff_tree_allocate_new_node_(DiffTreeNode** node, utils_str_t title);
-
-static void diff_tree_swap_nodes_(DiffTreeNode* node_a, DiffTreeNode* node_b);
+static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right);
 
 static DiffTreeErr diff_tree_fwrite_node_(DiffTreeNode* node, FILE* file);
 
@@ -72,14 +74,7 @@ DiffTreeErr diff_tree_ctor(DiffTree* diff_tree)
 
     DiffTreeErr err = DIFF_TREE_ERR_NONE;
 
-    utils_str_t deflt_s = {
-        .str = strdup(DEFAULT_NODE_),
-        .len = SIZEOF(DEFAULT_NODE_) - 1
-    };
-    
-    diff_tree_allocate_new_node_(&diff_tree->root, deflt_s);
-
-    diff_tree->size = 1;
+    diff_tree->size = 0;
 
     DIFF_TREE_DUMP(diff_tree, err);
 
@@ -108,14 +103,6 @@ void diff_tree_node_dtor_(DiffTree* dtree, DiffTreeNode* node)
         diff_tree_node_dtor_(dtree, node->left);
     if(node->right)
         diff_tree_node_dtor_(dtree, node->right);
-
-    if(dtree->buf.ptr) {
-        if(node->name.str >= dtree->buf.ptr + dtree->buf.len 
-                || node->name.str < dtree->buf.ptr)
-            NFREE(node->name.str);
-    }
-    else
-        NFREE(node->name.str);
 
     NFREE(node);
 }
@@ -162,9 +149,6 @@ DiffTreeErr diff_tree_fwrite_node_(DiffTreeNode* node, FILE* file)
     io_err = fprintf(file, "(");
     io_err >= 0 verified(return DIFF_TREE_IO_ERR);
 
-    io_err = fprintf(file, " \"%s\" ", node->name.str);
-    io_err >= 0 verified(return DIFF_TREE_IO_ERR);
-
     if(node->left)
         err = diff_tree_fwrite_node_(node->left, file);
     else
@@ -208,22 +192,34 @@ DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree)
     DIFF_TREE_ASSERT_OK_(dtree);
 
     int name_len = 0;
-    sscanf(dtree->buf.ptr + dtree->buf.pos, " \"%*[^\"]\"%n", &name_len);
+    sscanf(dtree->buf.ptr + dtree->buf.pos, " %*[^ ]%n", &name_len);
 
     dtree->buf.pos += (size_t) name_len;
 
-    dtree->buf.ptr[dtree->buf.pos - 1] = '\0';
+    dtree->buf.ptr[dtree->buf.pos] = '\0';
 
     return DIFF_TREE_ERR_NONE;
 }
 
-#define DIFF_TREE_LOG_SYNTAX_ERR(fname, dtree, expc)                            \
-    UTILS_LOGE(                                                                 \
-        LOG_CTG_DIFF_TREE,                                                      \
-        "%s:1:%ld: syntax error: unexpected symbol <%c>, expected <" expc ">",  \
-        fname,                                                                  \
-        dtree->buf.pos,                                                         \
-        dtree->buf.ptr[dtree->buf.pos]                                          \
+OperatorType diff_tree_match_operator_(char* str)
+{
+    for(size_t i = 0; i < SIZEOF(op_arr); ++i) {
+        if(!strcmp(str, op_arr[i].str)) {
+            return op_arr[i].type;
+        }
+    }
+
+    return OPERATOR_TYPE_NONE;
+}
+
+#define DIFF_TREE_LOG_SYNTAX_ERR(fname, dtree, expc)                                       \
+    UTILS_LOGE(                                                                            \
+        LOG_CTG_DIFF_TREE,                                                                 \
+        "%s:1:%ld: syntax error: unexpected symbol <%c> (ASCII:%d), expected <" expc ">",  \
+        fname,                                                                             \
+        dtree->buf.pos,                                                                    \
+        dtree->buf.ptr[dtree->buf.pos],                                                    \
+        (int)dtree->buf.ptr[dtree->buf.pos]                                                \
     );                                                                          
 
 DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const char* fname)
@@ -235,46 +231,63 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
     DIFF_TREE_DUMP(dtree, err);
 
     if(dtree->buf.ptr[dtree->buf.pos] == '(') {
-        utils_str_t name = { .str = NULL, .len = 0 };
-        err = diff_tree_allocate_new_node_(node, name);
-        err == DIFF_TREE_ERR_NONE verified(return err);
+        
+        *node = TYPED_CALLOC(sizeof(node[0]), DiffTreeNode);
 
         diff_tree_advance_buf_pos_(dtree);
         diff_tree_skip_spaces_(dtree);
 
-        if(dtree->buf.ptr[dtree->buf.pos] != '"') {
-            DIFF_TREE_LOG_SYNTAX_ERR(fname, dtree, "\"");
-            return DIFF_TREE_SYNTAX_ERR;
-        }
-
-        ssize_t buf_pos_prev = dtree->buf.pos;
+        ssize_t buf_pos_id_begin = dtree->buf.pos;
         err = diff_tree_scan_node_name_(dtree);
         err == DIFF_TREE_ERR_NONE verified(return err);
+        ssize_t buf_pos_id_end = dtree->buf.pos;
 
-        (*node)->name.str = dtree->buf.ptr + buf_pos_prev + 1;
-        (*node)->name.len = (size_t)(dtree->buf.pos - buf_pos_prev);
-
+        diff_tree_advance_buf_pos_(dtree);
         diff_tree_skip_spaces_(dtree);
 
         err = diff_tree_fread_node_(dtree, &(*node)->left, fname);
         err == DIFF_TREE_ERR_NONE verified(return err);
 
-        if((*node)->left) {
-            UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s -> %s", (*node)->left->name.str, (*node)->name.str);
-            (*node)->left->parent = (*node);
-        }
-
-        diff_tree_skip_spaces_(dtree);
-
         err = diff_tree_fread_node_(dtree, &(*node)->right, fname);
         err == DIFF_TREE_ERR_NONE verified(return err);
 
-        if((*node)->right) {
-            UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s -> %s", (*node)->right->name.str, (*node)->name.str);
-            (*node)->right->parent = (*node);
-        }
+        if(!(*node)->left && !(*node)->right) {
+            if(isdigit(dtree->buf.ptr[buf_pos_id_begin])) {
+                double num = atof(dtree->buf.ptr + buf_pos_id_begin);
+                (*node)->value.num = num;
+                (*node)->type = NODE_TYPE_NUM;
 
-        dtree->size++;
+                UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s:1:%ld: numerical value %f read", fname, buf_pos_id_begin, num);
+            }
+            else {
+                utils_hash_t hash = utils_djb2_hash(dtree->buf.ptr + buf_pos_id_begin, 
+                                                    (size_t)(buf_pos_id_end - buf_pos_id_begin));
+               
+                (*node)->value.var_hash = hash;
+                (*node)->type = NODE_TYPE_VAR;
+
+                UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s:1:%ld: variable hash %lu read", fname, buf_pos_id_begin, hash);
+            }
+        } 
+        else {
+            OperatorType op_type = diff_tree_match_operator_(dtree->buf.ptr + buf_pos_id_begin);
+
+            if(op_type == OPERATOR_TYPE_NONE) {
+                UTILS_LOGE(
+                    LOG_CTG_DIFF_TREE,
+                    "%s:1:%ld: syntax error: unknown operator",
+                    fname, buf_pos_id_begin
+                );
+
+                return DIFF_TREE_SYNTAX_ERR;
+            }
+
+            (*node)->type = NODE_TYPE_OP;
+            (*node)->value.op_type = op_type;
+
+            UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s:1:%ld: operator read", fname, buf_pos_id_begin);
+        } 
+
 
         if(dtree->buf.ptr[dtree->buf.pos] != ')') {
             DIFF_TREE_LOG_SYNTAX_ERR(fname, dtree, ")");
@@ -283,6 +296,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
 
         diff_tree_advance_buf_pos_(dtree);
         diff_tree_skip_spaces_(dtree);
+
     }
     else if(strncmp(dtree->buf.ptr + dtree->buf.pos, NIL_STR, SIZEOF(NIL_STR) - 1) == 0) {
 
@@ -293,6 +307,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
 
         dtree->buf.pos += SIZEOF(NIL_STR) - 1;
         diff_tree_skip_spaces_(dtree);
+
         *node = NULL;
     }
     else {
@@ -300,6 +315,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
         return DIFF_TREE_SYNTAX_ERR;
     }
 
+    dtree->size++;
     return DIFF_TREE_ERR_NONE;
 }
 
@@ -357,25 +373,21 @@ const char* diff_tree_strerr(DiffTreeErr err)
     }
 }
 
-DiffTreeErr diff_tree_allocate_new_node_(DiffTreeNode** node, utils_str_t name)
+static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right)
 {
-    utils_assert(node);
+    DiffTreeNode* node = (DiffTreeNode*)calloc(1, sizeof(node[0]));
 
-    DiffTreeNode* node_tmp = (DiffTreeNode*)calloc(1, sizeof(node_tmp[0]));
-    
-    node_tmp verified(return DIFF_TREE_ALLOC_FAIL);
+    if(!node)
+        return NULL;
 
-    node_tmp->name = name;
+    *node = {
+        .left = left,
+        .right = right,
+        .type = node_type,
+        .value = node_value,
+    };
 
-    *node = node_tmp;
-
-    return DIFF_TREE_ERR_NONE;
-}
-
-void diff_tree_swap_nodes_(DiffTreeNode* node_a, DiffTreeNode* node_b)
-{
-    // FIXME fix swap
-    utils_swap(&node_a->name, &node_b->name, sizeof(node_a->name));
+    return node;
 }
 
 #ifdef _DEBUG
@@ -388,7 +400,7 @@ void diff_tree_swap_nodes_(DiffTreeNode* node_a, DiffTreeNode* node_b)
 #define CLR_BLUE_LIGHT_  "\"#B0B0FF\""
 
 #define CLR_RED_BOLD_    "\"#FF0000\""
-#define CLR_GREEN_BOLD_  "\"#03c03c\""
+#define CLR_GREEN_BOLD_  "\"#03C03C\""
 #define CLR_BLUE_BOLD_   "\"#0000FF\""
 
 void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const char* filename, int line, const char* funcname)
@@ -434,9 +446,8 @@ void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const
         utils_log_fprintf("buf.ptr[%p] = ", diff_tree->buf.ptr); 
 
         if(err == DIFF_TREE_INVALID_BUFPOS) {
-            for(ssize_t i = 0; i < diff_tree->buf.len; ++i) {
+            for(ssize_t i = 0; i < diff_tree->buf.len; ++i)
                 utils_log_fprintf("%c", diff_tree->buf.ptr[i]);
-            }    
             utils_log_fprintf("\n");
             GOTO_END;
         }
@@ -455,7 +466,7 @@ void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const
 
         utils_log_fprintf("<font color=\"" CLR_PREV "\">"); 
         for(ssize_t i = 0; i < diff_tree->buf.pos; ++i) {
-            utils_log_fprintf("%c", diff_tree->buf.ptr[i]);
+            LOG_PRINTF_CHAR(diff_tree->buf.ptr[i], CLR_PREV);
         }
         utils_log_fprintf("</font>");
 
@@ -554,7 +565,7 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
             file, 
             "node_%p["
             "shape=record,"
-            "label=\" { parent: %p | addr: %p | name: \' %s \' | { L: %p | R: %p } } \","
+            "label=\" { parent: %p | addr: %p | type: %s | val: %s | { L: %p | R: %p } } \","
             "style=\"filled\","
             "color=" CLR_GREEN_BOLD_ ","
             "fillcolor=" CLR_GREEN_LIGHT_ ","
@@ -563,7 +574,8 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
             node,
             node->parent,
             node,
-            node->name.str,
+            node_type_str(node->type),
+            node_value_str(node->type, node->value),
             node->left,
             node->right,
             rank
@@ -582,7 +594,10 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
                 "<td colspan=\"2\">addr: %p</td>"
               "</tr>"
               "<tr>"
-                "<td colspan=\"2\">name: %s</td>"
+                "<td colspan=\"2\">type: %s</td>"
+              "</tr>"
+              "<tr>"
+                "<td colspan=\"2\">val: %s</td>"
               "</tr>"
               "<tr>"
                 "<td bgcolor=" CLR_RED_LIGHT_ ">L: %p</td>"
@@ -594,7 +609,8 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
             node,
             node->parent,
             node,
-            node->name.str,
+            node_type_str(node->type),
+            node_value_str(node->type, node->value),
             node->left,
             node->right,
             rank
