@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "logutils.h"
 #include "ioutils.h"
+#include <cstdlib>
 
 #define LOG_CATEGORY_OPT "OPTIONS"
 #define LOG_CATEGORY_APP "APP"
@@ -11,7 +12,8 @@
 static utils_long_opt_t long_opts[] = 
 {
     { OPT_ARG_REQUIRED, "log", NULL, 0, 0 },
-    { OPT_ARG_OPTIONAL, "db" , NULL, 0, 0 },
+    { OPT_ARG_REQUIRED, "in" , NULL, 0, 0 },
+    { OPT_ARG_REQUIRED, "out" , NULL, 0, 0 },
 };
 
 typedef enum AppState 
@@ -54,13 +56,28 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    if(!long_opts[1].is_set) {
+        return EXIT_FAILURE;
+    }
+
+    if(!long_opts[2].is_set) {
+        return EXIT_FAILURE;
+    }
+
     utils_init_log_file(long_opts[0].arg, LOG_DIR);
 
     DiffTree dtree = DIFF_TREE_INIT_LIST;
+    DiffTreeErr err = DIFF_TREE_ERR_NONE;
 
-    diff_tree_ctor(&dtree);
-
-    diff_tree_fread(&dtree, "input.txt"); 
+    err = diff_tree_ctor(&dtree, long_opts[2].arg);
+    if(err != DIFF_TREE_ERR_NONE) {
+        return EXIT_FAILURE;
+    }
+    
+    err = diff_tree_fread(&dtree, long_opts[1].arg); 
+    if(err != DIFF_TREE_ERR_NONE) {
+        return EXIT_FAILURE;
+    }
 
     // if(long_opts[1].is_set)
     //     err = fact_tree_fread(&dtree, long_opts[1].arg);
@@ -87,7 +104,9 @@ int main(int argc, char* argv[])
     //         }
     //     }
     // }
-    //
+
+    diff_tree_dump_latex(&dtree);
+
     diff_tree_dtor(&dtree);
 
     utils_end_log();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "stringutils.h"
 #include "stack.h"
@@ -51,17 +52,19 @@ typedef struct DiffTree
 
 } DiffTree;
 
-DiffTreeErr diff_tree_ctor(DiffTree* diff_tree);
+DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename);
 
 void diff_tree_dtor(DiffTree* diff_tree);
-
-DiffTreeErr diff_tree_insert(DiffTree* diff_tree, DiffTreeNode* node, DiffTreeNode** ret);
 
 const char* diff_tree_strerr(DiffTreeErr err);
 
 DiffTreeErr diff_tree_fwrite(DiffTree* diff_tree, const char* filename);
 
 DiffTreeErr diff_tree_fread(DiffTree* diff_tree, const char* filename);
+
+void diff_tree_dump_latex(DiffTree* tree);
+
+#ifdef _DEBUG 
 
 void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const char* file, int line, const char* funcname);
 
@@ -70,3 +73,5 @@ void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const
 
 #define DIFF_TREE_DUMP_MSG(diff_tree, err, msg) \
     diff_tree_dump(diff_tree, err, msg, __FILE__, __LINE__, __func__); 
+
+#endif // _DEBUG

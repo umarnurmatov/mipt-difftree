@@ -21,11 +21,9 @@
 #include "types.h"
 
 #define LOG_CTG_DIFF_TREE "DIFFTREE"
-
-#define DEFAULT_NODE_ "nothing"
-#define CHAR_ACCEPT_ 'y'
-#define CHAR_DECLINE_ 'n'
 #define NIL_STR "nil"
+
+static FILE* file_tex = NULL;
 
 #ifdef _DEBUG
 
@@ -46,6 +44,8 @@
 
 static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right);
 
+static void diff_tree_free_subtree_(DiffTreeNode* node);
+
 static DiffTreeErr diff_tree_fwrite_node_(DiffTreeNode* node, FILE* file);
 
 static DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const char* fname);
@@ -56,27 +56,33 @@ static int diff_tree_advance_buf_pos_(DiffTree* dtree);
 
 static void diff_tree_skip_spaces_(DiffTree* dtree);
 
+static void diff_tree_dump_node_latex_(DiffTreeNode* node);
+
+static DiffTreeErr diff_tree_init_latex_file_(const char* filename);
+
+static void diff_tree_end_latex_file_();
+
+
+#ifdef _DEBUG
+
 static char* diff_tree_dump_graphviz_(DiffTree* diff_tree);
 
 static void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank);
 
-#ifdef _DEBUG
-
 DiffTreeErr diff_tree_verify_(DiffTree* diff_tree);
-
-void diff_tree_node_dtor_(DiffTree* tree, DiffTreeNode* node);
 
 #endif // _DEBUG
 
-DiffTreeErr diff_tree_ctor(DiffTree* diff_tree)
+DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
 {
     utils_assert(diff_tree);
 
     DiffTreeErr err = DIFF_TREE_ERR_NONE;
 
     diff_tree->size = 0;
-
-    DIFF_TREE_DUMP(diff_tree, err);
+    
+    err = diff_tree_init_latex_file_(latex_filename);
+    err == DIFF_TREE_ERR_NONE verified(return err);
 
     return DIFF_TREE_ERR_NONE;
 }
@@ -85,7 +91,7 @@ void diff_tree_dtor(DiffTree* diff_tree)
 {
     utils_assert(diff_tree);
 
-    diff_tree_node_dtor_(diff_tree, diff_tree->root); 
+    diff_tree_free_subtree_(diff_tree->root); 
 
     diff_tree->size = 0;
     diff_tree->root = NULL;
@@ -93,33 +99,20 @@ void diff_tree_dtor(DiffTree* diff_tree)
     NFREE(diff_tree->buf.ptr);
     diff_tree->buf.pos = 0;
     diff_tree->buf.len = 0;
+
+    diff_tree_end_latex_file_();
 }
 
-void diff_tree_node_dtor_(DiffTree* dtree, DiffTreeNode* node)
+void diff_tree_free_subtree_(DiffTreeNode* node)
 {
     if(!node) return;
 
     if(node->left)
-        diff_tree_node_dtor_(dtree, node->left);
+        diff_tree_free_subtree_(node->left);
     if(node->right)
-        diff_tree_node_dtor_(dtree, node->right);
+        diff_tree_free_subtree_(node->right);
 
     NFREE(node);
-}
-
-DiffTreeErr diff_tree_insert(DiffTree* diff_tree, DiffTreeNode* node, DiffTreeNode** ret)
-{
-    DIFF_TREE_ASSERT_OK_(diff_tree);
-    utils_assert(ret);
-    utils_assert(node);
-
-    DiffTreeErr err = DIFF_TREE_ERR_NONE;
-
-    utils_str_t diff_s = UTILS_STR_INITLIST;
-        
-    ++diff_tree->size;
-
-    return DIFF_TREE_ERR_NONE;
 }
 
 DiffTreeErr diff_tree_fwrite(DiffTree* diff_tree, const char* filename)
@@ -225,6 +218,8 @@ OperatorType diff_tree_match_operator_(char* str)
 DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const char* fname)
 {
     DIFF_TREE_ASSERT_OK_(dtree);
+    utils_assert(node);
+    utils_assert(fname);
 
     DiffTreeErr err = DIFF_TREE_ERR_NONE;
 
@@ -326,8 +321,6 @@ DiffTreeErr diff_tree_fread(DiffTree* dtree, const char* filename)
     utils_assert(dtree);
     utils_assert(filename);
 
-    diff_tree_dtor(dtree);
-
     FILE* file = open_file(filename, "r");
     file verified(return DIFF_TREE_IO_ERR);
     
@@ -388,6 +381,76 @@ static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_valu
     };
 
     return node;
+}
+
+static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
+{
+    file_tex = open_file(filename, "w");
+    file_tex verified(return DIFF_TREE_IO_ERR);
+    
+    fprintf(
+        file_tex, 
+        "\\documentclass[a4paper,12pt]{article}\n"
+        "\\usepackage[a4paper,top=1.3cm,bottom=2cm,left=1.5cm,right=1.5cm]{geometry}\n"
+        "\\usepackage[T2A, T1]{fontenc}\n"
+        "\\usepackage[english,russian]{babel}\n"
+        "\\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}\n"
+        "\\begin{document}\n"
+    );
+
+    return DIFF_TREE_ERR_NONE;
+}
+
+static void diff_tree_end_latex_file_()
+{
+    utils_assert(file_tex);
+
+    fprintf(file_tex,
+            "\n\\end{document}\n");
+
+    fclose(file_tex);
+}
+
+static void diff_tree_dump_node_latex_(DiffTreeNode* node)
+{
+    utils_assert(node);
+    utils_assert(file_tex);
+
+    if(node->left)
+        diff_tree_dump_node_latex_(node->left);
+
+    switch(node->type) {
+        case NODE_TYPE_VAR:
+            fprintf(file_tex, " %lu ", node->value.var_hash);
+            break;
+        case NODE_TYPE_OP:
+            fprintf(file_tex, " %s ", op_arr[(int)node->value.op_type].str);
+            break;
+        case NODE_TYPE_NUM:
+            fprintf(file_tex, " %f ", node->value.num);
+            break;
+        default:
+            UTILS_LOGW(LOG_CTG_DIFF_TREE, "unrecognized operator type");
+            break;
+    }
+
+    if(node->right)
+        diff_tree_dump_node_latex_(node->right);
+}
+
+void diff_tree_dump_latex(DiffTree* tree)
+{
+    DIFF_TREE_ASSERT_OK_(tree);
+    utils_assert(file_tex);
+
+    fprintf(file_tex, 
+            "\\begin{equation}\n");
+
+    diff_tree_dump_node_latex_(tree->root);
+
+    fprintf(file_tex,
+            "\n\\end{equation}\n");
+
 }
 
 #ifdef _DEBUG
