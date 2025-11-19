@@ -441,23 +441,42 @@ void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const
             GOTO_END;
         }
 
-        utils_log_fprintf("<font color=\"#09AB00\">"); 
+#define CLR_PREV "#09AB00"
+#define CLR_CUR  "#C71022"
+#define CLR_NEXT "#1022C7"
+
+#define LOG_PRINTF_CHAR(ch, col) \
+    if(ch == '\0') \
+        utils_log_fprintf("<span style=\"border: 1px solid" col ";\">0</span>"); \
+    else if(isspace(ch)) \
+        utils_log_fprintf("<span style=\"border: 1px solid" col ";\"> </span>"); \
+    else \
+        utils_log_fprintf("%c", ch);
+
+        utils_log_fprintf("<font color=\"" CLR_PREV "\">"); 
         for(ssize_t i = 0; i < diff_tree->buf.pos; ++i) {
             utils_log_fprintf("%c", diff_tree->buf.ptr[i]);
         }
         utils_log_fprintf("</font>");
 
 
-        utils_log_fprintf("<font color=\"#C71022\"><b>%c</b></font>", diff_tree->buf.ptr[diff_tree->buf.pos]);
+        utils_log_fprintf("<font color=\"" CLR_CUR "\"><b>");
+        LOG_PRINTF_CHAR(diff_tree->buf.ptr[diff_tree->buf.pos], CLR_CUR);
+        utils_log_fprintf("</b></font>");
 
 
-        utils_log_fprintf("<font color=\"#1022C7\">"); 
+        utils_log_fprintf("<font color=\"" CLR_NEXT "\">"); 
         for(ssize_t i = diff_tree->buf.pos + 1; i < diff_tree->buf.len; ++i) {
-            utils_log_fprintf("%c", diff_tree->buf.ptr[i]);
+            LOG_PRINTF_CHAR(diff_tree->buf.ptr[i], CLR_NEXT);
         }
         utils_log_fprintf("</font>\n");
 
     } END;
+
+#undef CLR_PREV
+#undef CLR_CUR
+#undef CLR_NEXT
+#undef LOG_PRINTF_CHAR
 
     char* img_pref = diff_tree_dump_graphviz_(diff_tree);
 
