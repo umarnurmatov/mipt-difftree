@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include "colorutils.h"
 #include "hashutils.h"
@@ -51,8 +52,6 @@ static DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, c
 
 
 static void diff_tree_add_variable_(DiffTree* dtree, Variable new_var);
-
-static Variable* diff_tree_find_variable_(DiffTree* dtree, utils_hash_t hash);
 
 static OperatorType diff_tree_match_operator_(char* str);
 
@@ -209,12 +208,12 @@ DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree)
     return DIFF_TREE_ERR_NONE;
 }
 
-void diff_tree_add_variable_(DiffTree* dtree, Variable new_var)
+static void diff_tree_add_variable_(DiffTree* dtree, Variable new_var)
 {
     vector_push(&dtree->vars, &new_var);
 }
 
-Variable* diff_tree_find_variable_(DiffTree* dtree, utils_hash_t hash) 
+Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash) 
 {
     // FIXME use binsearch
 
@@ -228,7 +227,7 @@ Variable* diff_tree_find_variable_(DiffTree* dtree, utils_hash_t hash)
     return NULL;
 }
 
-OperatorType diff_tree_match_operator_(char* str)
+static OperatorType diff_tree_match_operator_(char* str)
 {
     // FIXME make hash comparasion
     for(size_t i = 0; i < SIZEOF(op_arr); ++i) {
@@ -295,7 +294,8 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
                                                     (size_t)(buf_pos_id_end - buf_pos_id_begin));
                 Variable new_var = {
                     .str = dtree->buf.ptr + buf_pos_id_begin,
-                    .hash = hash
+                    .hash = hash,
+                    .val = NAN
                 };
 
                 diff_tree_add_variable_(dtree, new_var);
@@ -448,7 +448,7 @@ static char* diff_tree_node_value_str_(DiffTree* dtree, NodeType node_type, Node
         case NODE_TYPE_OP:
             return (char*)node_op_type_str(val.op_type);
         case NODE_TYPE_VAR:
-            return diff_tree_find_variable_(dtree, val.var_hash)->str;
+            return diff_tree_find_variable(dtree, val.var_hash)->str;
         case NODE_TYPE_NUM:
             strfromd(buffer, BUF_LEN, "%f", val.num);
             return buffer;
@@ -470,7 +470,7 @@ static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
         "\\usepackage[T2A, T1]{fontenc}\n"
         "\\usepackage[english,russian]{babel}\n"
         "\\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}\n"
-        "\\begin{document}\n"
+        "\\begin{document}\n\n"
     );
 
     return DIFF_TREE_ERR_NONE;
@@ -496,7 +496,7 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
 
     switch(node->type) {
         case NODE_TYPE_VAR:
-            fprintf(file_tex, " %s ", diff_tree_find_variable_(dtree, node->value.var_hash)->str);
+            fprintf(file_tex, " %s ", diff_tree_find_variable(dtree, node->value.var_hash)->str);
             break;
         case NODE_TYPE_OP:
             fprintf(file_tex, " %s ", op_arr[(int)node->value.op_type].str);
@@ -524,7 +524,7 @@ void diff_tree_dump_latex(DiffTree* tree)
     diff_tree_dump_node_latex_(tree, tree->root);
 
     fprintf(file_tex,
-            "\n\\end{equation}\n");
+            "\n\\end{equation}\n\n");
 
 }
 

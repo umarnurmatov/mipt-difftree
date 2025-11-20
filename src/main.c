@@ -111,6 +111,13 @@ int main(int argc, char* argv[])
 
     diff_tree_dump_latex(&dtree);
 
+    ((Variable*)vector_at(&dtree.vars, 0))->val = 10;
+    ((Variable*)vector_at(&dtree.vars, 1))->val = 20;
+    
+    dtree.root = diff_tree_evaluate(&dtree, dtree.root);
+
+    diff_tree_dump_latex(&dtree);
+
     DIFF_TREE_DUMP(&dtree, err);
 
     diff_tree_dtor(&dtree);
