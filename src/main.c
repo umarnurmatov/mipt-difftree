@@ -1,10 +1,10 @@
 #include "difftree.h"
+#include "difftree_math.h"
 #include "optutils.h"
 #include "memutils.h"
 #include "utils.h"
 #include "logutils.h"
 #include "ioutils.h"
-#include <cstdlib>
 
 #define LOG_CATEGORY_OPT "OPTIONS"
 #define LOG_CATEGORY_APP "APP"
@@ -106,6 +106,12 @@ int main(int argc, char* argv[])
     // }
 
     diff_tree_dump_latex(&dtree);
+    
+    dtree.root = diff_tree_differentiate(&dtree, dtree.root, (Variable*)vector_at(&dtree.vars, 0));
+
+    diff_tree_dump_latex(&dtree);
+
+    DIFF_TREE_DUMP(&dtree, err);
 
     diff_tree_dtor(&dtree);
 
