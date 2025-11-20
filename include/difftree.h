@@ -4,8 +4,9 @@
 #include <stdio.h>
 
 #include "stringutils.h"
-#include "stack.h"
+#include "vector.h"
 #include "types.h"
+#include "variable.h"
 
 #define DIFF_TREE_INIT_LIST \
     {                       \
@@ -50,6 +51,8 @@ typedef struct DiffTree
         ssize_t pos;
     } buf;
 
+    Vector vars;
+
 } DiffTree;
 
 DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename);
@@ -61,6 +64,8 @@ const char* diff_tree_strerr(DiffTreeErr err);
 DiffTreeErr diff_tree_fwrite(DiffTree* diff_tree, const char* filename);
 
 DiffTreeErr diff_tree_fread(DiffTree* diff_tree, const char* filename);
+
+DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right);
 
 void diff_tree_dump_latex(DiffTree* tree);
 

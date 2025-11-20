@@ -15,10 +15,10 @@
 #include "stringutils.h"
 #include "assertutils.h"
 #include "logutils.h"
-#include "stack.h"
 
 #include "operators.h"
 #include "types.h"
+#include "vector.h"
 
 #define LOG_CTG_DIFF_TREE "DIFFTREE"
 #define NIL_STR "nil"
@@ -42,13 +42,23 @@ static FILE* file_tex = NULL;
 
 #endif // _DEBUG
 
-static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right);
-
 static void diff_tree_free_subtree_(DiffTreeNode* node);
 
 static DiffTreeErr diff_tree_fwrite_node_(DiffTreeNode* node, FILE* file);
 
 static DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const char* fname);
+
+
+
+static void diff_tree_add_variable_(DiffTree* dtree, Variable new_var);
+
+static Variable* diff_tree_find_variable_(DiffTree* dtree, utils_hash_t hash);
+
+static OperatorType diff_tree_match_operator_(char* str);
+
+
+static char* diff_tree_node_value_str_(DiffTree* dtree, NodeType node_type, NodeValue val);
+
 
 static DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree);
 
@@ -56,7 +66,7 @@ static int diff_tree_advance_buf_pos_(DiffTree* dtree);
 
 static void diff_tree_skip_spaces_(DiffTree* dtree);
 
-static void diff_tree_dump_node_latex_(DiffTreeNode* node);
+static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node);
 
 static DiffTreeErr diff_tree_init_latex_file_(const char* filename);
 
@@ -67,12 +77,13 @@ static void diff_tree_end_latex_file_();
 
 static char* diff_tree_dump_graphviz_(DiffTree* diff_tree);
 
-static void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank);
+void diff_tree_dump_node_graphviz_(DiffTree* dtree, FILE* file, DiffTreeNode* node, int rank);
 
 DiffTreeErr diff_tree_verify_(DiffTree* diff_tree);
 
 #endif // _DEBUG
 
+#define DEFAULT_VAR_VECTOR_CAPACITY 10
 DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
 {
     utils_assert(diff_tree);
@@ -83,6 +94,8 @@ DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
     
     err = diff_tree_init_latex_file_(latex_filename);
     err == DIFF_TREE_ERR_NONE verified(return err);
+
+    vector_ctor(&diff_tree->vars, DEFAULT_VAR_VECTOR_CAPACITY, sizeof(Variable));
 
     return DIFF_TREE_ERR_NONE;
 }
@@ -99,6 +112,8 @@ void diff_tree_dtor(DiffTree* diff_tree)
     NFREE(diff_tree->buf.ptr);
     diff_tree->buf.pos = 0;
     diff_tree->buf.len = 0;
+
+    vector_dtor(&diff_tree->vars);
 
     diff_tree_end_latex_file_();
 }
@@ -187,15 +202,35 @@ DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree)
     int name_len = 0;
     sscanf(dtree->buf.ptr + dtree->buf.pos, " %*[^ ]%n", &name_len);
 
-    dtree->buf.pos += (size_t) name_len;
+    dtree->buf.pos += (ssize_t) name_len;
 
     dtree->buf.ptr[dtree->buf.pos] = '\0';
 
     return DIFF_TREE_ERR_NONE;
 }
 
+void diff_tree_add_variable_(DiffTree* dtree, Variable new_var)
+{
+    vector_push(&dtree->vars, &new_var);
+}
+
+Variable* diff_tree_find_variable_(DiffTree* dtree, utils_hash_t hash) 
+{
+    // FIXME use binsearch
+
+    Vector* vars = &dtree->vars;
+    for(size_t i = 0; i < vars->size; ++i) {
+        Variable* var = (Variable*)vector_at(vars, i);
+        if(hash == var->hash)
+            return var;
+    }
+
+    return NULL;
+}
+
 OperatorType diff_tree_match_operator_(char* str)
 {
+    // FIXME make hash comparasion
     for(size_t i = 0; i < SIZEOF(op_arr); ++i) {
         if(!strcmp(str, op_arr[i].str)) {
             return op_arr[i].type;
@@ -255,8 +290,15 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
                 UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s:1:%ld: numerical value %f read", fname, buf_pos_id_begin, num);
             }
             else {
+
                 utils_hash_t hash = utils_djb2_hash(dtree->buf.ptr + buf_pos_id_begin, 
                                                     (size_t)(buf_pos_id_end - buf_pos_id_begin));
+                Variable new_var = {
+                    .str = dtree->buf.ptr + buf_pos_id_begin,
+                    .hash = hash
+                };
+
+                diff_tree_add_variable_(dtree, new_var);
                
                 (*node)->value.var_hash = hash;
                 (*node)->type = NODE_TYPE_VAR;
@@ -300,7 +342,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
             return DIFF_TREE_SYNTAX_ERR;
         }
 
-        dtree->buf.pos += SIZEOF(NIL_STR) - 1;
+        dtree->buf.pos += (ssize_t)(SIZEOF(NIL_STR) - 1);
         diff_tree_skip_spaces_(dtree);
 
         *node = NULL;
@@ -366,12 +408,11 @@ const char* diff_tree_strerr(DiffTreeErr err)
     }
 }
 
-static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right)
+DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right)
 {
-    DiffTreeNode* node = (DiffTreeNode*)calloc(1, sizeof(node[0]));
+    DiffTreeNode* node = TYPED_CALLOC(1, DiffTreeNode);
 
-    if(!node)
-        return NULL;
+    if(!node) return NULL;
 
     *node = {
         .left = left,
@@ -382,6 +423,25 @@ static DiffTreeNode* diff_tree_new_node_(NodeType node_type, NodeValue node_valu
 
     return node;
 }
+
+#define BUF_LEN 100
+static char* diff_tree_node_value_str_(DiffTree* dtree, NodeType node_type, NodeValue val)
+{
+    static char buffer[BUF_LEN] = "";
+
+    switch(node_type) {
+        case NODE_TYPE_OP:
+            return (char*)node_op_type_str(val.op_type);
+        case NODE_TYPE_VAR:
+            return diff_tree_find_variable_(dtree, val.var_hash)->str;
+        case NODE_TYPE_NUM:
+            strfromd(buffer, BUF_LEN, "%f", val.num);
+            return buffer;
+        default:
+            return "???";
+    }
+}
+#undef BUF_LEN
 
 static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
 {
@@ -411,17 +471,17 @@ static void diff_tree_end_latex_file_()
     fclose(file_tex);
 }
 
-static void diff_tree_dump_node_latex_(DiffTreeNode* node)
+static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
 {
     utils_assert(node);
     utils_assert(file_tex);
 
     if(node->left)
-        diff_tree_dump_node_latex_(node->left);
+        diff_tree_dump_node_latex_(dtree, node->left);
 
     switch(node->type) {
         case NODE_TYPE_VAR:
-            fprintf(file_tex, " %lu ", node->value.var_hash);
+            fprintf(file_tex, " %s ", diff_tree_find_variable_(dtree, node->value.var_hash)->str);
             break;
         case NODE_TYPE_OP:
             fprintf(file_tex, " %s ", op_arr[(int)node->value.op_type].str);
@@ -435,7 +495,7 @@ static void diff_tree_dump_node_latex_(DiffTreeNode* node)
     }
 
     if(node->right)
-        diff_tree_dump_node_latex_(node->right);
+        diff_tree_dump_node_latex_(dtree, node->right);
 }
 
 void diff_tree_dump_latex(DiffTree* tree)
@@ -446,7 +506,7 @@ void diff_tree_dump_latex(DiffTree* tree)
     fprintf(file_tex, 
             "\\begin{equation}\n");
 
-    diff_tree_dump_node_latex_(tree->root);
+    diff_tree_dump_node_latex_(tree, tree->root);
 
     fprintf(file_tex,
             "\n\\end{equation}\n");
@@ -588,7 +648,7 @@ char* diff_tree_dump_graphviz_(DiffTree* diff_tree)
     //     "];\n"
     // );
 
-    diff_tree_dump_node_graphviz_(file, diff_tree->root, 1);
+    diff_tree_dump_node_graphviz_(diff_tree, file, diff_tree->root, 1);
 
     fprintf(file, "};");
 
@@ -612,16 +672,16 @@ char* diff_tree_dump_graphviz_(DiffTree* diff_tree)
     return img_tmpnam;
 }
 
-void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
+void diff_tree_dump_node_graphviz_(DiffTree* dtree, FILE* file, DiffTreeNode* node, int rank)
 {
     utils_assert(file);
 
     if(!node) return;
 
     if(node->left)
-        diff_tree_dump_node_graphviz_(file, node->left, rank + 1); 
+        diff_tree_dump_node_graphviz_(dtree, file, node->left, rank + 1); 
     if(node->right) 
-        diff_tree_dump_node_graphviz_(file, node->right, rank + 1);
+        diff_tree_dump_node_graphviz_(dtree, file, node->right, rank + 1);
 
     if(!node->left && !node->right)
         fprintf(
@@ -638,7 +698,7 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
             node->parent,
             node,
             node_type_str(node->type),
-            node_value_str(node->type, node->value),
+            diff_tree_node_value_str_(dtree, node->type, node->value),
             node->left,
             node->right,
             rank
@@ -673,7 +733,7 @@ void diff_tree_dump_node_graphviz_(FILE* file, DiffTreeNode* node, int rank)
             node->parent,
             node,
             node_type_str(node->type),
-            node_value_str(node->type, node->value),
+            diff_tree_node_value_str_(dtree, node->type, node->value),
             node->left,
             node->right,
             rank

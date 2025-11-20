@@ -1,1 +1,1 @@
-SOURCES := difftree.c types.c stack.c main.c 
+SOURCES := difftree.c types.c difftree_math.c vector.c main.c 
