@@ -424,6 +424,21 @@ DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffT
     return node;
 }
 
+DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node)
+{
+    DiffTreeNode *new_node = NULL, *new_node_left = NULL, *new_node_right = NULL;
+
+    if(node->left)
+        new_node_left = diff_tree_copy_subtree(dtree, node->left);
+
+    if(node->right)
+        new_node_right = diff_tree_copy_subtree(dtree, node->right);
+
+    new_node = diff_tree_new_node(node->type, node->value, new_node_left, new_node_right);
+
+    return new_node;
+}
+
 #define BUF_LEN 100
 static char* diff_tree_node_value_str_(DiffTree* dtree, NodeType node_type, NodeValue val)
 {
