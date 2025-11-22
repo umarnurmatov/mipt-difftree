@@ -13,10 +13,10 @@ static DiffTreeNode* diff_tree_differentiate_num_(DiffTree* dtree, DiffTreeNode*
 static DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
 
 /* And here goes our DSL */
-#define dL diff_tree_differentiate(dtree, node->left, var)
-#define dR diff_tree_differentiate(dtree, node->right, var)
-#define cL diff_tree_copy_subtree(dtree, node->left)
-#define cR diff_tree_copy_subtree(dtree, node->right)
+#define cL diff_tree_copy_subtree(dtree, node->left, NULL)
+#define cR diff_tree_copy_subtree(dtree, node->right, NULL)
+#define dL diff_tree_differentiate(dtree, cL, var)
+#define dR diff_tree_differentiate(dtree, cR, var)
 
 #define ADD_(left, right) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right)
