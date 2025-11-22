@@ -95,6 +95,7 @@ DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
     err == DIFF_TREE_ERR_NONE verified(return err);
 
     vector_ctor(&diff_tree->vars, DEFAULT_VAR_VECTOR_CAPACITY, sizeof(Variable));
+    vector_ctor(&diff_tree->to_delete, DEFAULT_TO_DELETE_VECTOR_CAPACITY, sizeof(DiffTreeNode*));
 
     return DIFF_TREE_ERR_NONE;
 }
@@ -114,7 +115,10 @@ void diff_tree_dtor(DiffTree* diff_tree)
 
     vector_dtor(&diff_tree->vars);
 
-    diff_tree_end_latex_file_();
+    for(size_t i = 0; i < diff_tree->to_delete.size; ++i)
+        diff_tree_free_subtree(*(DiffTreeNode**)vector_at(&diff_tree->to_delete, i));
+
+    vector_dtor(&diff_tree->to_delete);
 }
 
 void diff_tree_free_subtree_(DiffTreeNode* node)

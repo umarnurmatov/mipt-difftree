@@ -53,6 +53,8 @@ typedef struct DiffTree
 
     Vector vars;
 
+    Vector to_delete;
+
 } DiffTree;
 
 DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename);
