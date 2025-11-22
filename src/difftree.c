@@ -261,7 +261,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
 
     if(dtree->buf.ptr[dtree->buf.pos] == '(') {
         
-        *node = TYPED_CALLOC(sizeof(node[0]), DiffTreeNode);
+        *node = TYPED_CALLOC(1, DiffTreeNode);
 
         diff_tree_advance_buf_pos_(dtree);
         diff_tree_skip_spaces_(dtree);
