@@ -65,7 +65,9 @@ DiffTreeErr diff_tree_fwrite(DiffTree* diff_tree, const char* filename);
 
 DiffTreeErr diff_tree_fread(DiffTree* diff_tree, const char* filename);
 
-DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right);
+DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right, DiffTreeNode *parent);
+
+DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node, DiffTreeNode* parent);
 
 DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node);
 

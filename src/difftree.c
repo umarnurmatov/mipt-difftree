@@ -409,32 +409,44 @@ const char* diff_tree_strerr(DiffTreeErr err)
 }
 
 DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right)
+DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffTreeNode *left, DiffTreeNode *right, DiffTreeNode *parent)
 {
     DiffTreeNode* node = TYPED_CALLOC(1, DiffTreeNode);
+
+    UTILS_LOGD(LOG_CTG_DIFF_TREE, "%p", node);
 
     if(!node) return NULL;
 
     *node = {
         .left = left,
         .right = right,
+        .parent = parent,
         .type = node_type,
         .value = node_value,
     };
 
+    if(right)
+        node->right->parent = node;
+
+    if(left)
+        node->left->parent = node;
+
     return node;
 }
 
-DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node)
+DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node, DiffTreeNode* parent)
 {
-    DiffTreeNode *new_node = NULL, *new_node_left = NULL, *new_node_right = NULL;
+    DiffTreeNode *new_node = diff_tree_new_node(node->type, node->value, NULL, NULL, NULL);
+    
+    UTILS_LOGD(LOG_CTG_DIFF_TREE, "new: %p, node: %p", new_node, node);
 
     if(node->left)
-        new_node_left = diff_tree_copy_subtree(dtree, node->left);
+        new_node->left = diff_tree_copy_subtree(dtree, node->left, new_node);
 
     if(node->right)
-        new_node_right = diff_tree_copy_subtree(dtree, node->right);
+        new_node->right = diff_tree_copy_subtree(dtree, node->right, new_node);
 
-    new_node = diff_tree_new_node(node->type, node->value, new_node_left, new_node_right);
+    new_node->parent = parent;
 
     return new_node;
 }
