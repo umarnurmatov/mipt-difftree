@@ -27,16 +27,34 @@ DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 #define dR diff_tree_differentiate(dtree, cR, var)
 
 #define ADD_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right, NULL)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right, node->parent)
 
 #define SUB_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right, NULL)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right, node->parent)
 
 #define MUL_(left, right) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_MUL }, left, right, NULL)
 
 #define DIV_(left, right) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_DIV }, left, right, NULL)
+
+#define SIN_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SIN }, left, NULL, NULL)
+
+#define COS_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_COS }, left, NULL, NULL)
+
+#define SH_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SH }, left, NULL, NULL)
+
+#define CH_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_CH }, left, NULL, NULL)
+
+#define POW_(left, right) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_POW }, left, right, NULL)
+
+#define SQRT_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SQRT }, left, NULL, NULL)
 
 #define CONST_(num_) \
     diff_tree_new_node(NODE_TYPE_NUM, NodeValue { .num = num_ }, NULL, NULL, NULL)
@@ -96,6 +114,35 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
             return DIV_(ADD_(MUL_(dL, cR), MUL_(dL, cR)), MUL_(cR, cR));
         case OPERATOR_TYPE_MUL:
             return ADD_(MUL_(dL, cR), MUL_(cL, dR));
+        case OPERATOR_TYPE_POW:
+            // FIXME
+            return NULL;
+        case OPERATOR_TYPE_SQRT:
+
+        case OPERATOR_TYPE_LOG:
+            return DIV_(dL, cL);
+        case OPERATOR_TYPE_SIN:
+            return MUL_(COS_(cL), dL);
+        case OPERATOR_TYPE_COS:
+            return MUL_(CONST_(-1), MUL_(COS_(cL), dL));
+        case OPERATOR_TYPE_TAN:
+            return DIV_(dL, POW_(COS_(cL), CONST_(2))); 
+        case OPERATOR_TYPE_CTG:
+            return MUL_(CONST_(-1), DIV_(dL, POW_(SIN_(cL), CONST_(2))));
+        case OPERATOR_TYPE_SH:
+            return MUL_(CH_(cL), dL);
+        case OPERATOR_TYPE_CH:
+            return MUL_(SH_(cL), dL);
+        case OPERATOR_TYPE_TH:
+            return DIV_(dL, POW_(CH_(cL), CONST_(2))); 
+        case OPERATOR_TYPE_ASIN:
+            return DIV_(dL, SQRT_(SUB_(CONST_(1), POW_(cL, CONST_(2)))));
+        case OPERATOR_TYPE_ACOS:
+            return MUL_(CONST_(-1), DIV_(dL, SQRT_(SUB_(CONST_(1), POW_(cL, CONST_(2))))));
+        case OPERATOR_TYPE_ATAN:
+            return DIV_(dL, ADD_(CONST_(1), POW_(cL, CONST_(2))));
+        case OPERATOR_TYPE_ACTG:
+            return MUL_(CONST_(-1), DIV_(dL, ADD_(CONST_(1), POW_(cL, CONST_(2)))));
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown operator %d", node->value.op_type);
             return NULL;
@@ -161,8 +208,7 @@ DiffTreeNode* diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
             return NULL;
     }
-    
-    DIFF_TREE_DUMP_NODE(dtree, new_node, DIFF_TREE_ERR_NONE);
+
     diff_tree_mark_to_delete(dtree, node);
     return new_node;
 }
