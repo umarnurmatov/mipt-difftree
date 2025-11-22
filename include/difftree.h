@@ -8,15 +8,17 @@
 #include "types.h"
 #include "variable.h"
 
-#define DIFF_TREE_INIT_LIST \
-    {                       \
-        .root = NULL,       \
-        .size = 0,          \
-        .buf = {            \
-            .ptr = NULL,    \
-            .len = 0,       \
-            .pos = 0        \
-        }                   \
+#define DIFF_TREE_INIT_LIST           \
+    {                                 \
+        .root = NULL,                 \
+        .size = 0,                    \
+        .buf = {                      \
+            .ptr = NULL,              \
+            .len = 0,                 \
+            .pos = 0                  \
+        },                            \
+        .vars = VECTOR_INITLIST,      \
+        .to_delete = VECTOR_INITLIST  \
     };                      
 
 typedef enum DiffTreeErr
@@ -27,6 +29,7 @@ typedef enum DiffTreeErr
     DIFF_TREE_ALLOC_FAIL,
     DIFF_TREE_IO_ERR,
     DIFF_TREE_SYNTAX_ERR
+
 } DiffTreeErr;
 
 typedef struct DiffTreeNode
@@ -63,6 +66,8 @@ void diff_tree_dtor(DiffTree* diff_tree);
 
 const char* diff_tree_strerr(DiffTreeErr err);
 
+void diff_tree_node_print(FILE* stream, void* node);
+
 DiffTreeErr diff_tree_fwrite(DiffTree* diff_tree, const char* filename);
 
 DiffTreeErr diff_tree_fread(DiffTree* diff_tree, const char* filename);
@@ -75,16 +80,22 @@ void diff_tree_free_subtree(DiffTreeNode* node);
 
 Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash);
 
-void diff_tree_dump_latex(DiffTree* tree);
+void diff_tree_mark_to_delete(DiffTree* dtree, DiffTreeNode* node);
+
+void diff_tree_dump_latex(DiffTree* tree, DiffTreeNode* node);
 
 #ifdef _DEBUG 
 
-void diff_tree_dump(DiffTree* diff_tree, DiffTreeErr err, const char* msg, const char* file, int line, const char* funcname);
+void diff_tree_dump(DiffTree* diff_tree, DiffTreeNode* node, DiffTreeErr err, const char* msg, const char* file, int line, const char* funcname);
+
+
+#define DIFF_TREE_DUMP_NODE(diff_tree, node, err) \
+    diff_tree_dump(diff_tree, node, err, NULL, __FILE__, __LINE__, __func__); 
 
 #define DIFF_TREE_DUMP(diff_tree, err) \
-    diff_tree_dump(diff_tree, err, NULL, __FILE__, __LINE__, __func__); 
+    diff_tree_dump(diff_tree, (diff_tree)->root, err, NULL, __FILE__, __LINE__, __func__); 
 
 #define DIFF_TREE_DUMP_MSG(diff_tree, err, msg) \
-    diff_tree_dump(diff_tree, err, msg, __FILE__, __LINE__, __func__); 
+    diff_tree_dump(diff_tree, (diff_tree)->root, err, msg, __FILE__, __LINE__, __func__); 
 
 #endif // _DEBUG
