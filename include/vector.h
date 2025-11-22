@@ -1,17 +1,18 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
 
+#include "utils.h"
 #include "varinfo.h"
 #include "hashutils.h"
 
-static const size_t   CAPACITY_EXP          = 2;
-static const unsigned CAPACITY_SHRINK_SCALE = 4;
+typedef void (*PrintCallback) (FILE*, void*);
 
-#ifdef VECTOR_DEBUG
-// FIXME varname in the beginning
-#define VECTOR_MAKE(VARNAME)           \
-    Vector VARNAME = {               \
+#ifdef _DEBUG
+
+#define VECTOR_INITLIST               \
+    {                                 \
         .buffer   = NULL,             \
         .size     = 0,                \
         .capacity = 0,                \
@@ -19,22 +20,20 @@ static const unsigned CAPACITY_SHRINK_SCALE = 4;
             .line     = __LINE__,     \
             .filename = __FILE__,     \
             .funcname = __func__,     \
-            .varname  = #VARNAME      \
         }                             \
     }
 
-#define IF_DEBUG(statement) statement
+#define VECTOR_DUMP(VEC, ERR, MSG, PRNT) \
+    vector_dump(stderr, VEC, ERR, MSG, __FILE__, __PRETTY_FUNCTION__, __LINE__, PRNT)
 
 #else
 
-#define VECTOR_MAKE(VARNAME) \
-    Vector VARNAME = {     \
-        .buffer   = NULL,   \
-        .size     = 0,      \
-        .capacity = 0       \
+#define VECTOR_INITLIST   \
+    {                     \
+        .buffer   = NULL, \
+        .size     = 0,    \
+        .capacity = 0     \
     } 
-
-#define IF_DEBUG(statement) 
 
 #endif // _DEBUG
 
@@ -63,6 +62,7 @@ struct Vector
         utils_hash_t buffer_hash;
 #endif // HASH_ENABLED
     );
+
 };
 
 VectorErr vector_ctor(Vector* vec, size_t capacity, size_t tsize);
@@ -74,4 +74,9 @@ void* vector_at(Vector* vec, size_t ind);
 VectorErr vector_pop(Vector* vec, void** val);
 
 void vector_dtor(Vector* vec);
+
+const char* vector_strerr(const VectorErr err);
+
+void vector_dump(FILE* stream, Vector* vec, VectorErr err, const char* msg, 
+                         const char* filename, const char* funcname, int line, PrintCallback print);
 

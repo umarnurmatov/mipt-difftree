@@ -3,27 +3,35 @@
 #include <assert.h>
 #include <memory.h>
 
+#include "difftree.h"
+#include "logutils.h"
 #include "sortutils.h"
+#include "assertutils.h"
 
-#ifdef VECTOR_DEBUG
+static const size_t   CAPACITY_EXP          = 2;
+static const unsigned CAPACITY_SHRINK_SCALE = 4;
+static const char*    LOG_CATEGORY_VEC      = "VECTOR";
 
-#define VECTOR_DUMP(STK, ERR, MSG) \
-    _vector_dump(stderr, STK, ERR, MSG, __FILE__, __func__, __LINE__)
+#define VECTOR_AT(vec, i) \
+    (void*)((char*) vec->buffer + i * vec->tsize)
 
-static void _vector_dump(FILE* stream, Vector* vec, vector_err_t err, const char* msg, 
-                        const char* filename, const char* funcname, int line);
+#ifdef _DEBUG
 
-static vector_err_t _vector_validate(Vector* vec);
+static VectorErr _vector_validate(Vector* vec);
 
 static utils_hash_t _vector_recalc_hashsum(Vector* vec);
 
-const vector_data_t POISON       = (vector_data_t)0xCAFEBABE;
+#define VECTOR_ASSERT_OK_(vec)                  \
+    {                                           \
+        err = _vector_validate(vec);            \
+        utils_assert(err == VECTOR_ERR_NONE);   \
+    }   
 
 #else
 
 #define VECTOR_ASSERT_OK_(vec)
 
-#endif // VECTOR_DEBUG
+#endif // _DEBUG
 
 
 static VectorErr vector_realloc_(Vector* vec, size_t capacity);
@@ -37,15 +45,13 @@ VectorErr vector_ctor(Vector* vec, size_t capacity, size_t tsize)
     vec->tsize  = tsize;
 
     err = vector_realloc_(vec, capacity);
+
     if(err == VECTOR_ERR_ALLOC_FAIL) {
-        IF_DEBUG(VECTOR_DUMP(vec, err, "failed to allocate buffer"));
+        IF_DEBUG(VECTOR_DUMP(vec, err, "failed to allocate buffer", NULL));
         return err;
     }
 
     IF_DEBUG(
-        vec->canary_begin = CANARY_BEGIN;
-        vec->canary_end   = CANARY_END;
-
         _vector_recalc_hashsum(vec);
     )
 
@@ -54,25 +60,25 @@ VectorErr vector_ctor(Vector* vec, size_t capacity, size_t tsize)
 
 void* vector_at(Vector* vec, size_t ind)
 {
+    VectorErr err = VECTOR_ERR_NONE;
     VECTOR_ASSERT_OK_(vec);
 
-    return (char*)vec->buffer + vec->tsize * ind;
+    return VECTOR_AT(vec, ind);
 }
 
 VectorErr vector_push(Vector* vec, void* val)
 {
     VectorErr err = VECTOR_ERR_NONE;
-    
     VECTOR_ASSERT_OK_(vec);
 
     if(vec->size == vec->capacity) {
         err = vector_realloc_(vec, vec->capacity * CAPACITY_EXP);
         if(err != VECTOR_ERR_NONE) {
-            IF_DEBUG(VECTOR_DUMP(vec, err, ""));
+            IF_DEBUG(VECTOR_DUMP(vec, err, "", NULL));
             return err;
         }
     }
-
+    UTILS_LOGD(LOG_CATEGORY_VEC, "%p %p", val, *(DiffTreeNode**)val);
     memcpy(vector_at(vec, vec->size++), val, vec->tsize);
 
     IF_DEBUG(
@@ -86,7 +92,6 @@ VectorErr vector_push(Vector* vec, void* val)
 VectorErr vector_pop(Vector* vec, void** val)
 {
     VectorErr err = VECTOR_ERR_NONE;
-
     VECTOR_ASSERT_OK_(vec);
 
     *val = vector_at(vec, --vec->size);
@@ -94,7 +99,7 @@ VectorErr vector_pop(Vector* vec, void** val)
     if(vec->capacity / vec->size >= CAPACITY_SHRINK_SCALE) {
         err = vector_realloc_(vec, vec->capacity / CAPACITY_EXP);
         if(err != VECTOR_ERR_NONE) {
-            IF_DEBUG(VECTOR_DUMP(vec, err, ""));
+            IF_DEBUG(VECTOR_DUMP(vec, err, "", NULL));
             return err;
         }
 
@@ -111,16 +116,12 @@ static VectorErr vector_realloc_(Vector* vec, size_t capacity)
 {
     void* buffer_tmp = realloc(
         vec->buffer, 
-        capacity * vec->tsize 
-    );
+        capacity * vec->tsize);
 
-    if(buffer_tmp == NULL)
+    if(!buffer_tmp)
         return VECTOR_ERR_ALLOC_FAIL;
 
-    IF_DEBUG(
-        for(size_t i = vec->size; i < capacity; ++i)
-            buffer_tmp[i] = POISON;
-    );
+    memset((char*)vec->buffer + vec->size * vec->tsize, 0, vec->capacity - vec->size);
 
     vec->buffer   = buffer_tmp;
     vec->capacity = capacity;
@@ -131,13 +132,7 @@ static VectorErr vector_realloc_(Vector* vec, size_t capacity)
 
 void vector_dtor(Vector* vec)
 {
-    IF_DEBUG(
-        vector_err_t err;
-        err = _vector_validate(vec);
-
-        if(err == VECTOR_ERR_NULL)
-            VECTOR_DUMP(vec, err, "tried to deinit uninitialized vector");
-    );
+    utils_assert(vec);
 
     free(vec->buffer);
 
@@ -177,9 +172,9 @@ const char* vector_strerr(const VectorErr err)
     }
 }
 
-#ifdef VECTOR_DEBUG
+#ifdef _DEBUG
 
-static vector_err_t _vector_validate(vec_t* vec)
+static VectorErr _vector_validate(Vector* vec)
 {
     if(vec == NULL)
         return VECTOR_ERR_NULL;
@@ -204,11 +199,22 @@ static vector_err_t _vector_validate(vec_t* vec)
     return VECTOR_ERR_NONE;
 }
 
-static void _vector_dump(FILE* stream, vec_t* vec, vector_err_t err, const char* msg, 
-                        const char* filename, const char* funcname, int line)
+void vector_dump(FILE* stream, Vector* vec, VectorErr err, const char* msg, 
+                        const char* filename, const char* funcname, int line, PrintCallback print)
 {
-    fputs("================================\n", stream);
-    fprintf(stream, "what: %s\n", msg);
+    utils_assert(filename);
+    utils_assert(funcname);
+    utils_assert(stream);
+
+    if(err != VECTOR_ERR_NONE)
+        UTILS_LOGE(LOG_CATEGORY_VEC, "vector dump (see below)");
+    else
+        UTILS_LOGD(LOG_CATEGORY_VEC, "vector dump (see below)");
+
+    fputs("========= VECTOR DUMP ==========\n", stream);
+
+    if(msg)
+        fprintf(stream, "what: %s\n", msg);
 
     fprintf(
         stream, 
@@ -231,11 +237,10 @@ static void _vector_dump(FILE* stream, vec_t* vec, vector_err_t err, const char*
         const varinfo_t* varinfo = &vec->varinfo;
         fprintf(
             stream, 
-            "  init: %s:%d %s(): %s\n", 
+            "  initizlized from: %s:%d %s()\n", 
             varinfo->filename, 
             varinfo->line, 
-            varinfo->funcname, 
-            varinfo->varname
+            varinfo->funcname
         );
 
         fprintf(
@@ -267,44 +272,21 @@ static void _vector_dump(FILE* stream, vec_t* vec, vector_err_t err, const char*
         fprintf(stream, "  buffer [%p]\n", vec->buffer);
         fputs("  {\n", stream);
 
-        fprintf(
-            stream, 
-            "    [#] = %x \t [CANARY] %s\n", 
-            (unsigned)vec->buffer[0],
-            err == VECTOR_ERR_CANARY_ESCAPED ? "(BAD)" : ""
-        );
+        if(!print) GOTO_END;
 
-        for(size_t i = 0; i < vec->capacity; ++i)
-            if(vec->buffer[i] == POISON)
-                fprintf(
-                    stream, 
-                    "    [%lu] = %d \t [POISON]\n", 
-                    i, 
-                    vec->buffer[CANARY_INDEX(i)]
-                );
-            else
-                fprintf(
-                    stream, 
-                    "   *[%lu] = %d %s\n", 
-                    i, 
-                    vec->buffer[CANARY_INDEX(i)],
-                    err == VECTOR_ERR_HASH_UNMATCH ? "\t (BAD)" : ""
-                );
+        for(size_t i = 0; i < vec->size; ++i) {
+            fprintf(stream, "    *[%lu] = ", i);
+            print(stream, VECTOR_AT(vec, i));
+            err == VECTOR_ERR_HASH_UNMATCH ? fputs(" (BAD)\n", stream) : fputs("\n", stream);
+        }
 
-        fprintf(
-            stream, 
-            "    [#] = %x \t [CANARY] %s\n", 
-            (unsigned)vec->buffer[CANARY_SIZE(vec->capacity) - 1],
-            err == VECTOR_ERR_CANARY_ESCAPED ? "(BAD)" : ""
-        );
-
-        fputs("}\n", stream);
+        fputs("  }\n}\n", stream);
     } END;
 
     fputs("================================\n\n", stream);
 }
 
-static utils_hash_t _vector_recalc_hashsum(vec_t* vec)
+static utils_hash_t _vector_recalc_hashsum(Vector* vec)
 {
 
 #ifdef HASH_ENABLED
