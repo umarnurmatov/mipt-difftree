@@ -21,45 +21,65 @@ DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 }
 
 /* And here goes our DSL */
-#define cL diff_tree_copy_subtree(dtree, node->left, NULL)
-#define cR diff_tree_copy_subtree(dtree, node->right, NULL)
+#define cL diff_tree_copy_subtree(dtree, node->left, node)
+#define cR diff_tree_copy_subtree(dtree, node->right, node)
 #define dL diff_tree_differentiate(dtree, cL, var)
 #define dR diff_tree_differentiate(dtree, cR, var)
 
 #define ADD_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right, NULL)
 
 #define SUB_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right, NULL)
 
 #define MUL_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_MUL }, left, right)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_MUL }, left, right, NULL)
 
 #define DIV_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_DIV }, left, right)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_DIV }, left, right, NULL)
 
 #define CONST_(num_) \
-    diff_tree_new_node(NODE_TYPE_NUM, NodeValue { .num = num_ }, NULL, NULL)
+    diff_tree_new_node(NODE_TYPE_NUM, NodeValue { .num = num_ }, NULL, NULL, NULL)
 
 DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Variable* var)
 {
-    diff_tree_dump_latex(dtree);
+    utils_assert(dtree);
+    utils_assert(node);
+    utils_assert(var);
+
+    DiffTreeNode* new_node = NULL;
 
     switch(node->type) {
         case NODE_TYPE_OP:
-            return diff_tree_differentiate_op_(dtree, node, var);
+            new_node = diff_tree_differentiate_op_(dtree, node, var);
+            break;
 
         case NODE_TYPE_VAR:
-            return diff_tree_differentiate_var_(dtree, node, var);
+            new_node = diff_tree_differentiate_var_(dtree, node, var);
+            break;
 
         case NODE_TYPE_NUM:
-            return diff_tree_differentiate_num_(dtree, node, var);
+            new_node = diff_tree_differentiate_num_(dtree, node, var);
+            break;
 
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
             return NULL;
     }
 
+    if(node->parent) {
+        if(node == node->parent->left)
+            node->parent->left = new_node;
+        else if(node == node->parent->right)
+            node->parent->right = new_node;
+    }
+
+    diff_tree_dump_latex(dtree, new_node);
+    DIFF_TREE_DUMP_NODE(dtree, new_node, DIFF_TREE_ERR_NONE);
+
+    diff_tree_mark_to_delete(dtree, node);
+
+    return new_node;
 }
 
 static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* node, Variable* var)
@@ -95,6 +115,9 @@ static DiffTreeNode* diff_tree_differentiate_var_(ATTR_UNUSED DiffTree* dtree, D
 
 static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, ATTR_UNUSED DiffTreeNode* node, ATTR_UNUSED Variable* var)
 {
+    utils_assert(node);
+    utils_assert(node->type == NODE_TYPE_NUM);
+
     return CONST_(0);
 }
 
@@ -116,20 +139,32 @@ DiffTreeErr diff_tree_evaluate_tree(DiffTree* dtree)
 
 DiffTreeNode* diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
 {
+    utils_assert(dtree);
+    utils_assert(node);
+
+    DiffTreeNode* new_node = NULL;
+
     switch(node->type) {
         case NODE_TYPE_OP:
-            return diff_tree_evaluate_op_(dtree, node);
+            new_node = diff_tree_evaluate_op_(dtree, node);
+            break;
 
         case NODE_TYPE_VAR:
-            return CONST_(diff_tree_find_variable(dtree, node->value.var_hash)->val);
+            new_node = CONST_(diff_tree_find_variable(dtree, node->value.var_hash)->val);
+            break;
 
         case NODE_TYPE_NUM:
-            return node;
+            new_node = CONST_(node->value.num);
+            break;
 
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
             return NULL;
     }
+    
+    DIFF_TREE_DUMP_NODE(dtree, new_node, DIFF_TREE_ERR_NONE);
+    diff_tree_mark_to_delete(dtree, node);
+    return new_node;
 }
 
 DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
@@ -144,7 +179,6 @@ DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
 
     if(node->right)
        right = diff_tree_evaluate(dtree, node->right);
-
 
     switch(node->value.op_type) {
         case OPERATOR_TYPE_ADD:
