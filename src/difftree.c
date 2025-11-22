@@ -754,31 +754,53 @@ void diff_tree_dump_node_graphviz_(DiffTree* dtree, FILE* file, DiffTreeNode* no
             rank
         );
 
-    if(node->left)
-        fprintf(
-            file,
-            "node_%p -> node_%p ["
-            "dir=both," 
-            "label=\"No\","
-            "color=" CLR_RED_BOLD_ ","
-            "fontcolor=" CLR_RED_BOLD_ ","
-            "];\n",
-            node, 
-            node->left
-        );
+    if(node->left) {
+        if(node->left->parent == node)
+            fprintf(
+                file,
+                "node_%p -> node_%p ["
+                "dir=both," 
+                "color=" CLR_RED_BOLD_ ","
+                "fontcolor=" CLR_RED_BOLD_ ","
+                "];\n",
+                node, 
+                node->left
+            );
+        else
+            fprintf(
+                file,
+                "node_%p -> node_%p ["
+                "color=" CLR_RED_BOLD_ ","
+                "fontcolor=" CLR_RED_BOLD_ ","
+                "];\n",
+                node, 
+                node->left
+            );
+    }
 
-    if(node->right)
-        fprintf(
-            file,
-            "node_%p -> node_%p ["
-            "dir=both," 
-            "label=\"Yes\","
-            "color=" CLR_BLUE_BOLD_ ","
-            "fontcolor=" CLR_BLUE_BOLD_ ","
-            "];\n",
-            node, 
-            node->right
-        );
+    if(node->right) {
+        if(node->right->parent == node)
+            fprintf(
+                file,
+                "node_%p -> node_%p ["
+                "dir=both," 
+                "color=" CLR_BLUE_BOLD_ ","
+                "fontcolor=" CLR_BLUE_BOLD_ ","
+                "];\n",
+                node, 
+                node->right
+            );
+        else
+            fprintf(
+                file,
+                "node_%p -> node_%p ["
+                "color=" CLR_BLUE_BOLD_ ","
+                "fontcolor=" CLR_BLUE_BOLD_ ","
+                "];\n",
+                node, 
+                node->right
+            );
+    }
 }
 
 DiffTreeErr diff_tree_verify_(DiffTree* diff_tree)
