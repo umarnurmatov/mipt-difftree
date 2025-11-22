@@ -229,7 +229,7 @@ DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree)
 static void diff_tree_add_variable_(DiffTree* dtree, Variable new_var)
 {
     vector_push(&dtree->vars, &new_var);
-    VECTOR_DUMP(&dtree->to_delete, VECTOR_ERR_NONE, NULL, variable_print_callback);
+    VECTOR_DUMP(&dtree->vars, VECTOR_ERR_NONE, NULL, variable_print_callback);
 }
 
 Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash) 
