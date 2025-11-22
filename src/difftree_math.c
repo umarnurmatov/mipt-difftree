@@ -12,6 +12,14 @@ static DiffTreeNode* diff_tree_differentiate_num_(DiffTree* dtree, DiffTreeNode*
 
 static DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
 
+
+DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
+{
+    dtree->root = diff_tree_differentiate(dtree, dtree->root, var);
+
+    return DIFF_TREE_ERR_NONE;
+}
+
 /* And here goes our DSL */
 #define cL diff_tree_copy_subtree(dtree, node->left, NULL)
 #define cR diff_tree_copy_subtree(dtree, node->right, NULL)
@@ -98,6 +106,13 @@ static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, A
 #undef SUB_
 #undef MUL_
 #undef DIV_
+
+DiffTreeErr diff_tree_evaluate_tree(DiffTree* dtree)
+{
+    dtree->root = diff_tree_evaluate(dtree, dtree->root);
+
+    return DIFF_TREE_ERR_NONE;
+}
 
 DiffTreeNode* diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
 {
