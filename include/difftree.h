@@ -71,7 +71,7 @@ DiffTreeNode* diff_tree_new_node(NodeType node_type, NodeValue node_value, DiffT
 
 DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node, DiffTreeNode* parent);
 
-DiffTreeNode* diff_tree_copy_subtree(DiffTree* dtree, DiffTreeNode* node);
+void diff_tree_free_subtree(DiffTreeNode* node);
 
 Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash);
 

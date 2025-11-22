@@ -43,8 +43,6 @@ static FILE* file_tex = NULL;
 
 #endif // _DEBUG
 
-static void diff_tree_free_subtree_(DiffTreeNode* node);
-
 static DiffTreeErr diff_tree_fwrite_node_(DiffTreeNode* node, FILE* file);
 
 static DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const char* fname);
