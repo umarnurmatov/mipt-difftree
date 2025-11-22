@@ -114,16 +114,15 @@ VectorErr vector_pop(Vector* vec, void** val)
 
 static VectorErr vector_realloc_(Vector* vec, size_t capacity)
 {
-    void* buffer_tmp = realloc(
+    vec->buffer = realloc(
         vec->buffer, 
         capacity * vec->tsize);
 
-    if(!buffer_tmp)
+    if(!vec->buffer)
         return VECTOR_ERR_ALLOC_FAIL;
 
     memset((char*)vec->buffer + vec->size * vec->tsize, 0, vec->capacity - vec->size);
 
-    vec->buffer   = buffer_tmp;
     vec->capacity = capacity;
 
     return VECTOR_ERR_NONE;
