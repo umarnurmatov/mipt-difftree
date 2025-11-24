@@ -1,4 +1,8 @@
 #include "difftree_math.h"
+
+#include <math.h>
+#include <fenv.h>
+
 #include "difftree.h"
 #include "logutils.h"
 #include "types.h"
@@ -6,12 +10,17 @@
 
 #define LOG_CTG_DMATH "DIFFTREE_MATH"
 
+static bool IS_FE_EXCEPTION_SET = false;
+
 static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 static DiffTreeNode* diff_tree_differentiate_var_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 static DiffTreeNode* diff_tree_differentiate_num_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 
-static DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
+static double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
 
+static const char* diff_tree_get_fe_exception_str(void);
+
+static void diff_tree_check_math_errors(DiffTreeNode* node);
 
 DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 {
@@ -118,7 +127,7 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
             // FIXME
             return NULL;
         case OPERATOR_TYPE_SQRT:
-
+            return DIV_(dL, MUL_(CONST_(2), SQRT_(cL)));
         case OPERATOR_TYPE_LOG:
             return DIV_(dL, cL);
         case OPERATOR_TYPE_SIN:
@@ -177,67 +186,165 @@ static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, A
 #undef MUL_
 #undef DIV_
 
-DiffTreeErr diff_tree_evaluate_tree(DiffTree* dtree)
+double diff_tree_evaluate_tree(DiffTree* dtree)
 {
-    dtree->root = diff_tree_evaluate(dtree, dtree->root);
+    return diff_tree_evaluate(dtree, dtree->root);
 
     return DIFF_TREE_ERR_NONE;
 }
 
-DiffTreeNode* diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
+double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
 {
     utils_assert(dtree);
     utils_assert(node);
 
-    DiffTreeNode* new_node = NULL;
+    double res = NAN;
 
     switch(node->type) {
         case NODE_TYPE_OP:
-            new_node = diff_tree_evaluate_op_(dtree, node);
+            res = diff_tree_evaluate_op_(dtree, node);
             break;
 
         case NODE_TYPE_VAR:
-            new_node = CONST_(diff_tree_find_variable(dtree, node->value.var_hash)->val);
+            res = diff_tree_find_variable(dtree, node->value.var_hash)->val;
             break;
 
         case NODE_TYPE_NUM:
-            new_node = CONST_(node->value.num);
+            res = node->value.num;
             break;
 
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
-            return NULL;
+            break;
     }
 
-    diff_tree_mark_to_delete(dtree, node);
-    return new_node;
+    // diff_tree_mark_to_delete(dtree, node);
+    return res;
 }
 
-DiffTreeNode* diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
+#define left_ left
+#define right_ right
+
+#define CHECK_MATH_ERR \
+    diff_tree_check_math_errors(node);
+
+#define CHECK_MATH_ERR_AND_RET         \
+    diff_tree_check_math_errors(node); \
+    return res;
+
+double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
 {
     utils_assert(node);
     utils_assert(node->type == NODE_TYPE_OP);
 
-    DiffTreeNode *left = NULL, *right = NULL;
+    double left = NAN, right = NAN;
+
+    double res = NAN;
 
     if(node->left)
        left = diff_tree_evaluate(dtree, node->left);
 
+    if(IS_FE_EXCEPTION_SET) return res;
+
     if(node->right)
        right = diff_tree_evaluate(dtree, node->right);
 
+    if(IS_FE_EXCEPTION_SET) return res;
+
+    // FIXME
+    if(get_operator(node->value.op_type)->argnum == 2) {
+    }
+
     switch(node->value.op_type) {
         case OPERATOR_TYPE_ADD:
-            return CONST_(left->value.num + right->value.num);
+            res = left_ + right_;
+            CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SUB:
-            return CONST_(left->value.num - right->value.num);
+            res = left_ - right_;
+            CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_DIV:
-            return CONST_(left->value.num / right->value.num);
+            res = left_ / right_;
+            CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_MUL:
-            return CONST_(left->value.num * right->value.num);
+            res = left_ * right_;
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_POW:
+            res = pow(left_, right_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_SQRT:
+            res = sqrt(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_LOG:
+            res = log10(left_); 
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_SIN:
+            res = sin(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_COS:
+            res = cos(res);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_TAN:
+            res = tan(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_CTG:
+            res = tan(left_);
+            CHECK_MATH_ERR;
+            res = 1 / res;
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_SH:
+            res = sinh(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_CH:
+            res = cosh(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_TH:
+            res = tanh(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_ASIN:
+            res = asin(left_);
+            CHECK_MATH_ERR_AND_RET;
+            return res;
+        case OPERATOR_TYPE_ACOS:
+            res = acos(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_ATAN:
+            res = atan(left_);
+            CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_ACTG:
+            res = atan(left_);
+            CHECK_MATH_ERR;
+            res = 1 / res;
+            CHECK_MATH_ERR_AND_RET;
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown operator %d", node->value.op_type);
-            return NULL;
+            return NAN;
     }
 }
+
+#undef left_
+#undef right_
+#undef CHECK_MATH_ERR
+#undef CHECK_MATH_ERR_AND_RET
+
+static const char* diff_tree_get_fe_exception_str(void)
+{
+    IS_FE_EXCEPTION_SET = true;
+
+    if(fetestexcept(FE_DIVBYZERO))       return "division by zero";
+    if(fetestexcept(FE_INVALID))         return "domain error";
+    if(fetestexcept(FE_OVERFLOW))        return "overflow";
+    if(fetestexcept(FE_UNDERFLOW))       return "underflow";
+
+    IS_FE_EXCEPTION_SET = false;
+
+    return NULL;
+}
+
+static void diff_tree_check_math_errors(DiffTreeNode* node)
+{
+    const char* errstr = diff_tree_get_fe_exception_str();
+    if(errstr)
+        UTILS_LOGE(LOG_CTG_DMATH, "%s", errstr);
+}
+
 

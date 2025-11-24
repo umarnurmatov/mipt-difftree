@@ -1,4 +1,5 @@
 #include "operators.h"
+#include "assertutils.h"
 
 int operators_prepare_op_arr()
 {                                                                                       
@@ -27,4 +28,11 @@ int operators_prepare_op_arr()
     // asmblr->pref##_tbl_size = tbl_size_tmp;                                             
     //
     // return ASSEMBLER_ERR_NONE;                                                          
+}
+
+const Operator* get_operator(OperatorType op_type)
+{
+    utils_assert((unsigned)op_type < SIZEOF(op_arr));
+
+    return &op_arr[(unsigned)op_type];
 }

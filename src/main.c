@@ -105,20 +105,16 @@ int main(int argc, char* argv[])
     //     }
     // }
 
-    diff_tree_dump_latex(&dtree);
+    diff_tree_dump_latex(&dtree, dtree.root);
     
-    dtree.root = diff_tree_differentiate(&dtree, dtree.root, (Variable*)vector_at(&dtree.vars, 0));
+    diff_tree_differentiate_tree(&dtree, (Variable*)vector_at(&dtree.vars,0));
 
-    diff_tree_dump_latex(&dtree);
+    DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
-    ((Variable*)vector_at(&dtree.vars, 0))->val = 10;
+    ((Variable*)vector_at(&dtree.vars, 0))->val = 0.5;
     ((Variable*)vector_at(&dtree.vars, 1))->val = 20;
     
-    dtree.root = diff_tree_evaluate(&dtree, dtree.root);
-
-    diff_tree_dump_latex(&dtree);
-
-    DIFF_TREE_DUMP(&dtree, err);
+    printf("%f\n", diff_tree_evaluate_tree(&dtree));
 
     diff_tree_dtor(&dtree);
 
