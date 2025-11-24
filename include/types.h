@@ -5,7 +5,8 @@ typedef enum NodeType
 {
     NODE_TYPE_OP,
     NODE_TYPE_VAR,
-    NODE_TYPE_NUM
+    NODE_TYPE_NUM,
+    NODE_TYPE_FAKE
 }
 NodeType;
 
@@ -16,6 +17,7 @@ typedef enum OperatorType
     OPERATOR_TYPE_MUL,
     OPERATOR_TYPE_DIV,
     OPERATOR_TYPE_POW,
+    OPERATOR_TYPE_EXP,
     OPERATOR_TYPE_SQRT,
     OPERATOR_TYPE_LOG,
     OPERATOR_TYPE_SIN,

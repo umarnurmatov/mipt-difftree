@@ -16,6 +16,7 @@
 #include "stringutils.h"
 #include "assertutils.h"
 #include "logutils.h"
+#include "floatutils.h"
 
 #include "operators.h"
 #include "types.h"
@@ -345,6 +346,11 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
             (*node)->type = NODE_TYPE_OP;
             (*node)->value.op_type = op_type;
 
+            if(get_operator(op_type)->argnum == 1) {
+                diff_tree_mark_to_delete(dtree, (*node)->right);
+                (*node)->right = NULL;
+            }
+
             UTILS_LOGD(LOG_CTG_DIFF_TREE, "%s:1:%ld: operator read", fname, buf_pos_id_begin);
         } 
 
@@ -405,6 +411,9 @@ DiffTreeErr diff_tree_fread(DiffTree* dtree, const char* filename)
         DIFF_TREE_DUMP(dtree, err);
         return err;
     }
+
+    dtree->root = diff_tree_new_node(NODE_TYPE_FAKE, NodeValue { .num = NAN }, 
+                                     dtree->root, NULL, NULL);
 
     DIFF_TREE_DUMP(dtree, err);
 
@@ -495,6 +504,8 @@ static char* diff_tree_node_value_str_(DiffTree* dtree, NodeType node_type, Node
         case NODE_TYPE_NUM:
             strfromd(buffer, BUF_LEN, "%f", val.num);
             return buffer;
+        case NODE_TYPE_FAKE:
+            return "fakeval";
         default:
             return "???";
     }
@@ -534,11 +545,10 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
     utils_assert(node);
     utils_assert(file_tex);
 
-    if(node->type == NODE_TYPE_OP)
+    if(node->type == NODE_TYPE_OP) {
+        fprintf(file_tex, "{\\left (");
         fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_pref);
-    else 
-        fprintf(file_tex, "\\left(");
-
+    }
 
     if(node->left)
         diff_tree_dump_node_latex_(dtree, node->left);
@@ -551,8 +561,14 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
             fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_inf);
             break;
         case NODE_TYPE_NUM:
-            fprintf(file_tex, "%f", node->value.num);
+        {
+            double val = node->value.num;
+            if(utils_equal_with_precision(val, floor(val)))
+                fprintf(file_tex, "%ld", (long) val);
+            else
+                fprintf(file_tex, "%f", node->value.num);
             break;
+        }
         default:
             UTILS_LOGW(LOG_CTG_DIFF_TREE, "unrecognized operator type");
             break;
@@ -561,10 +577,10 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
     if(node->right)
         diff_tree_dump_node_latex_(dtree, node->right);
 
-    if(node->type == NODE_TYPE_OP)
+    if(node->type == NODE_TYPE_OP) {
         fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_post);
-    else
-        fprintf(file_tex, "\\right)");
+        fprintf(file_tex, "\\right )}");
+    }
 }
 
 void diff_tree_dump_latex(DiffTree* tree, DiffTreeNode* node)

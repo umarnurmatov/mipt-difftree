@@ -26,15 +26,17 @@ static Operator op_arr[] =
 
     MAKE_OPERATOR("-", "",        "-",  "",  OPERATOR_TYPE_SUB, 2),
 
-    MAKE_OPERATOR("*", "",        "*",  "",  OPERATOR_TYPE_MUL, 2),
+    MAKE_OPERATOR("*", "",        "\\cdot",  "",  OPERATOR_TYPE_MUL, 2),
 
     MAKE_OPERATOR("/", "\\frac{", "}{", "}", OPERATOR_TYPE_DIV, 2),
 
     MAKE_OPERATOR("^", ""       , "^",  "" , OPERATOR_TYPE_POW, 2),
 
+    MAKE_OPERATOR("exp", "e^{"       , "",  "}" , OPERATOR_TYPE_EXP, 1),
+
     MAKE_OPERATOR("sqrt", "\\sqrt{" , "",  "}" , OPERATOR_TYPE_POW, 1),
 
-    MAKE_OPERATOR("log", "\\log\\left(" , ""  , "\\right)", OPERATOR_TYPE_LOG, 1),
+    MAKE_OPERATOR("log", "\\log\\left (" , ""  , "\\right )", OPERATOR_TYPE_LOG, 1),
 
     MAKE_OPERATOR("sin", "\\sin\\left(", "", "\\right)", OPERATOR_TYPE_SIN, 1),
 

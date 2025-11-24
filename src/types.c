@@ -6,6 +6,7 @@ const char* node_type_str(NodeType node_type)
         case NODE_TYPE_OP:  return "OP";
         case NODE_TYPE_VAR: return "VAR";
         case NODE_TYPE_NUM: return "NUM";
+        case NODE_TYPE_FAKE:return "FAKE";
         default:            return "???";
     }
 }
@@ -18,6 +19,7 @@ const char* node_op_type_str(OperatorType op_type)
         case OPERATOR_TYPE_MUL:   return "MUL";
         case OPERATOR_TYPE_DIV:   return "DIV";
         case OPERATOR_TYPE_POW:   return "POW";
+        case OPERATOR_TYPE_EXP:   return "EXP";
         case OPERATOR_TYPE_SQRT:  return "SQRT";
         case OPERATOR_TYPE_LOG:   return "LOG";
         case OPERATOR_TYPE_SIN:   return "SIN";

@@ -1,7 +1,9 @@
 #include "difftree.h"
 #include "difftree_math.h"
+#include "difftree_optimize.h"
 #include "optutils.h"
 #include "memutils.h"
+#include "types.h"
 #include "utils.h"
 #include "logutils.h"
 #include "ioutils.h"
@@ -71,11 +73,13 @@ int main(int argc, char* argv[])
 
     err = diff_tree_ctor(&dtree, long_opts[2].arg);
     if(err != DIFF_TREE_ERR_NONE) {
+        diff_tree_dtor(&dtree);
         return EXIT_FAILURE;
     }
     
     err = diff_tree_fread(&dtree, long_opts[1].arg); 
     if(err != DIFF_TREE_ERR_NONE) {
+        diff_tree_dtor(&dtree);
         return EXIT_FAILURE;
     }
 
@@ -105,16 +109,24 @@ int main(int argc, char* argv[])
     //     }
     // }
 
-    diff_tree_dump_latex(&dtree, dtree.root);
-    
-    diff_tree_differentiate_tree(&dtree, (Variable*)vector_at(&dtree.vars,0));
+    diff_tree_dump_latex(&dtree, dtree.root->left);
+
+    diff_tree_optimize(&dtree);
 
     DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
-    ((Variable*)vector_at(&dtree.vars, 0))->val = 0.5;
+    diff_tree_differentiate_tree(&dtree, (Variable*)vector_at(&dtree.vars,0));
+
+    diff_tree_optimize(&dtree);
+
+    DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
+
+    diff_tree_dump_latex(&dtree, dtree.root->left);
+
+    ((Variable*)vector_at(&dtree.vars, 0))->val = 10;
     ((Variable*)vector_at(&dtree.vars, 1))->val = 20;
-    
-    printf("%f\n", diff_tree_evaluate_tree(&dtree));
+
+    UTILS_LOGI(LOG_CATEGORY_APP, "evaluated: %f\n", diff_tree_evaluate_tree(&dtree));
 
     diff_tree_dtor(&dtree);
 

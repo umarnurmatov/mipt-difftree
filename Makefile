@@ -62,7 +62,8 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 .PHONY: run
 run: $(BUILD_DIR)/$(EXECUTABLE)
-	@./$< --log=log.html --db=db4.txt
+	./$< --log=log.html --in=input.txt --out=output.tex
+	latexmk -pdf -auxdir=build/latex output.tex
 
 .PHONY: clean
 clean:

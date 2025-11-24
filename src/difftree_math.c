@@ -1,5 +1,6 @@
 #include "difftree_math.h"
 
+#include <cfenv>
 #include <math.h>
 #include <fenv.h>
 
@@ -7,6 +8,8 @@
 #include "logutils.h"
 #include "types.h"
 #include "operators.h"
+
+#pragma STDC FENV_ACCESS ON
 
 #define LOG_CTG_DMATH "DIFFTREE_MATH"
 
@@ -16,15 +19,13 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
 static DiffTreeNode* diff_tree_differentiate_var_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 static DiffTreeNode* diff_tree_differentiate_num_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 
-static double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
-
 static const char* diff_tree_get_fe_exception_str(void);
 
 static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right);
 
 DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 {
-    dtree->root = diff_tree_differentiate(dtree, dtree->root, var);
+    dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
 
     return DIFF_TREE_ERR_NONE;
 }
@@ -58,6 +59,12 @@ DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 
 #define CH_(left) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_CH }, left, NULL, NULL)
+
+#define LOG_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_LOG }, left, NULL, NULL)
+
+#define EXP_(left) \
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_EXP }, left, NULL, NULL)
 
 #define POW_(left, right) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_POW }, left, right, NULL)
@@ -124,8 +131,24 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
         case OPERATOR_TYPE_MUL:
             return ADD_(MUL_(dL, cR), MUL_(cL, dR));
         case OPERATOR_TYPE_POW:
-            // FIXME
-            return NULL;
+        {
+            bool left = diff_tree_subtree_holds_var(node->left);
+            bool right = diff_tree_subtree_holds_var(node->right);
+
+            if(left && right) {
+                DiffTreeNode* exp_f_1 = MUL_(cR, LOG_(cL));
+                DiffTreeNode* exp_f_2 = MUL_(cR, LOG_(cL));
+                return MUL_(EXP_(exp_f_1), diff_tree_differentiate(dtree, exp_f_2, var));
+            }
+            else if(left)
+                return MUL_(POW_(cL, SUB_(cR, CONST_(1))), dL);
+            else if(right)
+                return MUL_(MUL_(POW_(cL, cR), LOG_(cL)), dR);
+            else {
+                UTILS_LOGE(LOG_CTG_DMATH, "constant folding was not run");
+                return NULL;
+            }
+        }
         case OPERATOR_TYPE_SQRT:
             return DIV_(dL, MUL_(CONST_(2), SQRT_(cL)));
         case OPERATOR_TYPE_LOG:
@@ -188,9 +211,8 @@ static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, A
 
 double diff_tree_evaluate_tree(DiffTree* dtree)
 {
-    return diff_tree_evaluate(dtree, dtree->root);
-
-    return DIFF_TREE_ERR_NONE;
+    feclearexcept(FE_ALL_EXCEPT);
+    return diff_tree_evaluate(dtree, dtree->root->left);
 }
 
 double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
@@ -202,7 +224,7 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
 
     switch(node->type) {
         case NODE_TYPE_OP:
-            res = diff_tree_evaluate_op_(dtree, node);
+            res = diff_tree_evaluate_op(dtree, node);
             break;
 
         case NODE_TYPE_VAR:
@@ -218,7 +240,6 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
             break;
     }
 
-    // diff_tree_mark_to_delete(dtree, node);
     return res;
 }
 
@@ -232,7 +253,7 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
     diff_tree_check_math_errors(node, left, right); \
     return res;
 
-double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
+double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
 {
     utils_assert(node);
     utils_assert(node->type == NODE_TYPE_OP);
@@ -250,8 +271,8 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
     if(IS_FE_EXCEPTION_SET) return res;
 
     // FIXME
-    if(get_operator(node->value.op_type)->argnum == 2) {
-    }
+    // if(get_operator(node->value.op_type)->argnum == 2) {
+    // }
 
     switch(node->value.op_type) {
         case OPERATOR_TYPE_ADD:
@@ -269,11 +290,14 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
         case OPERATOR_TYPE_POW:
             res = pow(left_, right_);
             CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_EXP:
+            res = exp(left_);
+            CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SQRT:
             res = sqrt(left_);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_LOG:
-            res = log10(left_); 
+            res = log2(left_); 
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SIN:
             res = sin(left_);
@@ -324,6 +348,28 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
 #undef CHECK_MATH_ERR
 #undef CHECK_MATH_ERR_AND_RET
 
+
+bool diff_tree_subtree_holds_var(DiffTreeNode* node)
+{
+    utils_assert(node);
+    bool ret = false;
+
+    if(node->right) {
+        ret = diff_tree_subtree_holds_var(node->right);
+        if(ret) return true;
+    }
+
+    if(node->left) {
+        ret = diff_tree_subtree_holds_var(node->left);
+        if(ret) return true;
+    }
+
+    if(node->type == NODE_TYPE_VAR)
+        return true;
+    
+    return false;
+}
+
 static const char* diff_tree_get_fe_exception_str(void)
 {
     IS_FE_EXCEPTION_SET = true;
@@ -340,6 +386,8 @@ static const char* diff_tree_get_fe_exception_str(void)
 
 static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right)
 {
+    utils_assert(node);
+
     const char* errstr = diff_tree_get_fe_exception_str();
     const Operator* op = get_operator(node->value.op_type);
     if(errstr) {
