@@ -20,7 +20,7 @@ static double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node);
 
 static const char* diff_tree_get_fe_exception_str(void);
 
-static void diff_tree_check_math_errors(DiffTreeNode* node);
+static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right);
 
 DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 {
@@ -225,11 +225,11 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
 #define left_ left
 #define right_ right
 
-#define CHECK_MATH_ERR \
-    diff_tree_check_math_errors(node);
+#define CHECK_MATH_ERR                              \
+    diff_tree_check_math_errors(node, left, right);
 
-#define CHECK_MATH_ERR_AND_RET         \
-    diff_tree_check_math_errors(node); \
+#define CHECK_MATH_ERR_AND_RET                      \
+    diff_tree_check_math_errors(node, left, right); \
     return res;
 
 double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
@@ -237,9 +237,7 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
     utils_assert(node);
     utils_assert(node->type == NODE_TYPE_OP);
 
-    double left = NAN, right = NAN;
-
-    double res = NAN;
+    double left = NAN, right = NAN, res = NAN;
 
     if(node->left)
        left = diff_tree_evaluate(dtree, node->left);
@@ -289,7 +287,7 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
         case OPERATOR_TYPE_CTG:
             res = tan(left_);
             CHECK_MATH_ERR;
-            res = 1 / res;
+            res = 1.f / res;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SH:
             res = sinh(left_);
@@ -313,7 +311,7 @@ double diff_tree_evaluate_op_(DiffTree* dtree, DiffTreeNode* node)
         case OPERATOR_TYPE_ACTG:
             res = atan(left_);
             CHECK_MATH_ERR;
-            res = 1 / res;
+            res = 1.f / res;
             CHECK_MATH_ERR_AND_RET;
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown operator %d", node->value.op_type);
@@ -330,21 +328,29 @@ static const char* diff_tree_get_fe_exception_str(void)
 {
     IS_FE_EXCEPTION_SET = true;
 
-    if(fetestexcept(FE_DIVBYZERO))       return "division by zero";
-    if(fetestexcept(FE_INVALID))         return "domain error";
-    if(fetestexcept(FE_OVERFLOW))        return "overflow";
-    if(fetestexcept(FE_UNDERFLOW))       return "underflow";
+    if(fetestexcept(FE_DIVBYZERO)) return "division by zero";
+    if(fetestexcept(FE_INVALID))   return "domain error";
+    if(fetestexcept(FE_OVERFLOW))  return "overflow";
+    if(fetestexcept(FE_UNDERFLOW)) return "underflow";
 
     IS_FE_EXCEPTION_SET = false;
 
     return NULL;
 }
 
-static void diff_tree_check_math_errors(DiffTreeNode* node)
+static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right)
 {
     const char* errstr = diff_tree_get_fe_exception_str();
-    if(errstr)
-        UTILS_LOGE(LOG_CTG_DMATH, "%s", errstr);
+    const Operator* op = get_operator(node->value.op_type);
+    if(errstr) {
+        if(op->argnum == 1)
+            UTILS_LOGE(LOG_CTG_DMATH, 
+                       "%s(%f): %s", op->str, left, errstr);
+        else if(op->argnum == 2)
+            UTILS_LOGE(LOG_CTG_DMATH, 
+                       "%f %s %f: %s", left, 
+                       op->str, right, errstr);
+    }
 }
 
 
