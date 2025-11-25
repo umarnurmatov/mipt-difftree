@@ -34,7 +34,7 @@ static Operator op_arr[] =
 
     MAKE_OPERATOR("exp", "e^{"       , "",  "}" , OPERATOR_TYPE_EXP, 1),
 
-    MAKE_OPERATOR("sqrt", "\\sqrt{" , "",  "}" , OPERATOR_TYPE_POW, 1),
+    MAKE_OPERATOR("sqrt", "\\sqrt{" , "",  "}" , OPERATOR_TYPE_SQRT, 1),
 
     MAKE_OPERATOR("log", "\\log{" , ""  , "}", OPERATOR_TYPE_LOG, 1),
 
