@@ -1,3 +1,4 @@
+#pragma once
 #include "difftree.h"
 
 DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var);
