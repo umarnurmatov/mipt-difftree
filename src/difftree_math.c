@@ -141,7 +141,7 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
                 return MUL_(EXP_(exp_f_1), diff_tree_differentiate(dtree, exp_f_2, var));
             }
             else if(left)
-                return MUL_(POW_(cL, SUB_(cR, CONST_(1))), dL);
+                return MUL_(MUL_(cR, POW_(cL, SUB_(cR, CONST_(1)))), dL);
             else if(right)
                 return MUL_(MUL_(POW_(cL, cR), LOG_(cL)), dR);
             else {
@@ -149,6 +149,8 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
                 return NULL;
             }
         }
+        case OPERATOR_TYPE_EXP:
+            return MUL_(EXP_(cL), dL);
         case OPERATOR_TYPE_SQRT:
             return DIV_(dL, MUL_(CONST_(2), SQRT_(cL)));
         case OPERATOR_TYPE_LOG:
@@ -235,6 +237,10 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
             res = node->value.num;
             break;
 
+        case NODE_TYPE_FAKE:
+            UTILS_LOGE(LOG_CTG_DMATH, "fake node occured");
+            break;
+
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
             break;
@@ -303,7 +309,7 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
             res = sin(left_);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_COS:
-            res = cos(res);
+            res = cos(left_);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_TAN:
             res = tan(left_);
