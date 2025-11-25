@@ -26,37 +26,37 @@ static Operator op_arr[] =
 
     MAKE_OPERATOR("-", "",        "-",  "",  OPERATOR_TYPE_SUB, 2),
 
-    MAKE_OPERATOR("*", "",        "\\cdot",  "",  OPERATOR_TYPE_MUL, 2),
+    MAKE_OPERATOR("*", "{",        "}\\cdot{",  "}",  OPERATOR_TYPE_MUL, 2),
 
     MAKE_OPERATOR("/", "\\frac{", "}{", "}", OPERATOR_TYPE_DIV, 2),
 
-    MAKE_OPERATOR("^", ""       , "^",  "" , OPERATOR_TYPE_POW, 2),
+    MAKE_OPERATOR("^", "{"       , "}^{",  "}" , OPERATOR_TYPE_POW, 2),
 
     MAKE_OPERATOR("exp", "e^{"       , "",  "}" , OPERATOR_TYPE_EXP, 1),
 
     MAKE_OPERATOR("sqrt", "\\sqrt{" , "",  "}" , OPERATOR_TYPE_POW, 1),
 
-    MAKE_OPERATOR("log", "\\log\\left (" , ""  , "\\right )", OPERATOR_TYPE_LOG, 1),
+    MAKE_OPERATOR("log", "\\log{" , ""  , "}", OPERATOR_TYPE_LOG, 1),
 
-    MAKE_OPERATOR("sin", "\\sin\\left(", "", "\\right)", OPERATOR_TYPE_SIN, 1),
+    MAKE_OPERATOR("sin", "\\sin{", "", "}", OPERATOR_TYPE_SIN, 1),
 
-    MAKE_OPERATOR("cos", "\\cos\\left(", "", "\\right)", OPERATOR_TYPE_COS, 1),
+    MAKE_OPERATOR("cos", "\\cos{", "", "}", OPERATOR_TYPE_COS, 1),
 
-    MAKE_OPERATOR("tan", "\\tg\\left(", "", "\\right)", OPERATOR_TYPE_TAN, 1),
+    MAKE_OPERATOR("tan", "\\tg{", "", "}", OPERATOR_TYPE_TAN, 1),
 
-    MAKE_OPERATOR("ctg", "\\ctg\\left(", "", "\\right)", OPERATOR_TYPE_CTG, 1),
+    MAKE_OPERATOR("ctg", "\\ctg{", "", "}", OPERATOR_TYPE_CTG, 1),
 
-    MAKE_OPERATOR("sh", "\\sh\\left(", "", "\\right)", OPERATOR_TYPE_SH, 1),
+    MAKE_OPERATOR("sh", "\\sh{", "", "}", OPERATOR_TYPE_SH, 1),
 
-    MAKE_OPERATOR("ch", "\\ch\\left(", "", "\\right)", OPERATOR_TYPE_CH, 1),
+    MAKE_OPERATOR("ch", "\\ch{", "", "}", OPERATOR_TYPE_CH, 1),
 
-    MAKE_OPERATOR("th", "\\th\\left(", "", "\\right)", OPERATOR_TYPE_TH, 1),
+    MAKE_OPERATOR("th", "\\th{", "", "}", OPERATOR_TYPE_TH, 1),
 
-    MAKE_OPERATOR("arcsin", "\\arcsin\\left(", "", "\\right)", OPERATOR_TYPE_ASIN, 1),
+    MAKE_OPERATOR("arcsin", "\\arcsin{", "", "}", OPERATOR_TYPE_ASIN, 1),
 
-    MAKE_OPERATOR("arccos", "\\arccos\\left(", "", "\\right)", OPERATOR_TYPE_ACOS, 1),
+    MAKE_OPERATOR("arccos", "\\arccos{", "", "}", OPERATOR_TYPE_ACOS, 1),
 
-    MAKE_OPERATOR("arctg", "\\arctan\\left(", "", "\\right)", OPERATOR_TYPE_ATAN, 1),
+    MAKE_OPERATOR("arctg", "\\arctan{", "", "}", OPERATOR_TYPE_ATAN, 1),
 
 };
 

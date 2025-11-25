@@ -1,5 +1,6 @@
 #include "difftree.h"
 
+#include <algorithm>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -17,6 +18,7 @@
 #include "assertutils.h"
 #include "logutils.h"
 #include "floatutils.h"
+#include "mathutils.h"
 
 #include "operators.h"
 #include "types.h"
@@ -70,6 +72,8 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node);
 static DiffTreeErr diff_tree_init_latex_file_(const char* filename);
 
 static void diff_tree_end_latex_file_();
+
+static int diff_tree_get_node_height_(DiffTreeNode* node);
 
 
 #ifdef _DEBUG
@@ -304,7 +308,7 @@ DiffTreeErr diff_tree_fread_node_(DiffTree* dtree, DiffTreeNode** node, const ch
 
         if((*node)->right) (*node)->right->parent = (*node);
 
-        if(!(*node)->left && !(*node)->right) {
+        if(!(*node)->left) {
             if(isdigit(dtree->buf.ptr[buf_pos_id_begin])) {
                 double num = atof(dtree->buf.ptr + buf_pos_id_begin);
                 (*node)->value.num = num;
@@ -540,13 +544,30 @@ static void diff_tree_end_latex_file_()
     fclose(file_tex);
 }
 
+static int diff_tree_get_node_height_(DiffTreeNode* node)
+{
+    utils_assert(node);
+
+    int hleft = 0, hright = 0;
+
+    if(node->right)
+        hright = diff_tree_get_node_height_(node->right);
+
+    if(node->left)
+        hleft = diff_tree_get_node_height_(node->left);
+
+    return 1 + utils_imax(hright, hleft);
+}
+
 static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
 {
     utils_assert(node);
     utils_assert(file_tex);
 
+    int height = diff_tree_get_node_height_(node);
+
     if(node->type == NODE_TYPE_OP) {
-        fprintf(file_tex, "{\\left (");
+        if(height >= 3) fprintf(file_tex, "\\left (");
         fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_pref);
     }
 
@@ -555,18 +576,18 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
 
     switch(node->type) {
         case NODE_TYPE_VAR:
-            fprintf(file_tex, "%s", diff_tree_find_variable(dtree, node->value.var_hash)->str);
+            fprintf(file_tex, " %s ", diff_tree_find_variable(dtree, node->value.var_hash)->str);
             break;
         case NODE_TYPE_OP:
-            fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_inf);
+            fprintf(file_tex, " %s ", op_arr[(int)node->value.op_type].latex_str_inf);
             break;
         case NODE_TYPE_NUM:
         {
             double val = node->value.num;
             if(utils_equal_with_precision(val, floor(val)))
-                fprintf(file_tex, "%ld", (long) val);
+                fprintf(file_tex, " %ld ", (long) val);
             else
-                fprintf(file_tex, "%f", node->value.num);
+                fprintf(file_tex, " %f ", node->value.num);
             break;
         }
         default:
@@ -579,7 +600,7 @@ static void diff_tree_dump_node_latex_(DiffTree* dtree, DiffTreeNode* node)
 
     if(node->type == NODE_TYPE_OP) {
         fprintf(file_tex, "%s", op_arr[(int)node->value.op_type].latex_str_post);
-        fprintf(file_tex, "\\right )}");
+        if(height >= 3) fprintf(file_tex, "\\right )");
     }
 }
 
