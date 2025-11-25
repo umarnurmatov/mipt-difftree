@@ -127,7 +127,7 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
         case OPERATOR_TYPE_SUB:
             return SUB_(dL, dR);
         case OPERATOR_TYPE_DIV:
-            return DIV_(ADD_(MUL_(dL, cR), MUL_(dL, cR)), MUL_(cR, cR));
+            return DIV_(ADD_(MUL_(dL, cR), MUL_(cL, dR)), POW_(cR, CONST_(2)));
         case OPERATOR_TYPE_MUL:
             return ADD_(MUL_(dL, cR), MUL_(cL, dR));
         case OPERATOR_TYPE_POW:
