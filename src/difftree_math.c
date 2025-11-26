@@ -5,7 +5,9 @@
 #include <fenv.h>
 
 #include "difftree.h"
+#include "difftree_optimize.h"
 #include "logutils.h"
+#include "mathutils.h"
 #include "types.h"
 #include "operators.h"
 
@@ -23,10 +25,13 @@ static const char* diff_tree_get_fe_exception_str(void);
 
 static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right);
 
-DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
+DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n)
 {
-    dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
-
+    diff_tree_optimize(dtree);
+    for(size_t i = 0; i < n; ++i) {
+        dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
+        diff_tree_optimize(dtree);
+    }
     return DIFF_TREE_ERR_NONE;
 }
 
@@ -37,10 +42,10 @@ DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 #define dR diff_tree_differentiate(dtree, cR, var)
 
 #define ADD_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right, node->parent)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_ADD }, left, right, NULL)
 
 #define SUB_(left, right) \
-    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right, node->parent)
+    diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_SUB }, left, right, NULL)
 
 #define MUL_(left, right) \
     diff_tree_new_node(NODE_TYPE_OP, NodeValue { OPERATOR_TYPE_MUL }, left, right, NULL)
@@ -74,6 +79,9 @@ DiffTreeErr diff_tree_differentiate_tree(DiffTree* dtree, Variable* var)
 
 #define CONST_(num_) \
     diff_tree_new_node(NODE_TYPE_NUM, NodeValue { .num = num_ }, NULL, NULL, NULL)
+
+#define VAR_(var) \
+    diff_tree_new_node(NODE_TYPE_VAR, NodeValue { .var_hash = var->hash }, NULL, NULL, NULL)
 
 DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Variable* var)
 {
@@ -158,7 +166,7 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
         case OPERATOR_TYPE_SIN:
             return MUL_(COS_(cL), dL);
         case OPERATOR_TYPE_COS:
-            return MUL_(CONST_(-1), MUL_(COS_(cL), dL));
+            return MUL_(CONST_(-1), MUL_(SIN_(cL), dL));
         case OPERATOR_TYPE_TAN:
             return DIV_(dL, POW_(COS_(cL), CONST_(2))); 
         case OPERATOR_TYPE_CTG:
@@ -249,9 +257,6 @@ double diff_tree_evaluate(DiffTree* dtree, DiffTreeNode* node)
     return res;
 }
 
-#define left_ left
-#define right_ right
-
 #define CHECK_MATH_ERR                              \
     diff_tree_check_math_errors(node, left, right);
 
@@ -282,64 +287,64 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
 
     switch(node->value.op_type) {
         case OPERATOR_TYPE_ADD:
-            res = left_ + right_;
+            res = left + right;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SUB:
-            res = left_ - right_;
+            res = left - right;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_DIV:
-            res = left_ / right_;
+            res = left / right;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_MUL:
-            res = left_ * right_;
+            res = left * right;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_POW:
-            res = pow(left_, right_);
+            res = pow(left, right);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_EXP:
-            res = exp(left_);
+            res = exp(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SQRT:
-            res = sqrt(left_);
+            res = sqrt(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_LOG:
-            res = log2(left_); 
+            res = log(left); 
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SIN:
-            res = sin(left_);
+            res = sin(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_COS:
-            res = cos(left_);
+            res = cos(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_TAN:
-            res = tan(left_);
+            res = tan(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_CTG:
-            res = tan(left_);
+            res = tan(left);
             CHECK_MATH_ERR;
             res = 1.f / res;
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_SH:
-            res = sinh(left_);
+            res = sinh(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_CH:
-            res = cosh(left_);
+            res = cosh(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_TH:
-            res = tanh(left_);
+            res = tanh(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_ASIN:
-            res = asin(left_);
+            res = asin(left);
             CHECK_MATH_ERR_AND_RET;
             return res;
         case OPERATOR_TYPE_ACOS:
-            res = acos(left_);
+            res = acos(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_ATAN:
-            res = atan(left_);
+            res = atan(left);
             CHECK_MATH_ERR_AND_RET;
         case OPERATOR_TYPE_ACTG:
-            res = atan(left_);
+            res = atan(left);
             CHECK_MATH_ERR;
             res = 1.f / res;
             CHECK_MATH_ERR_AND_RET;
@@ -349,8 +354,6 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
     }
 }
 
-#undef left_
-#undef right_
 #undef CHECK_MATH_ERR
 #undef CHECK_MATH_ERR_AND_RET
 
@@ -406,5 +409,3 @@ static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double 
                        op->str, right, errstr);
     }
 }
-
-

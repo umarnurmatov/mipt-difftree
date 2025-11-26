@@ -37,19 +37,19 @@ void diff_tree_optimize(DiffTree *dtree)
 
 static DiffTreeNode* diff_tree_const_fold_(DiffTree* dtree, DiffTreeNode* node)
 {
-    DiffTreeNode *cleft = NULL, *cright = NULL;
+    DiffTreeNode *left = NULL, *right = NULL;
 
     if(node->left)
-        cleft = diff_tree_const_fold_(dtree, node->left);
+        left = diff_tree_const_fold_(dtree, node->left);
 
     if(node->right)
-        cright = diff_tree_const_fold_(dtree, node->right);
+        right = diff_tree_const_fold_(dtree, node->right);
 
-    bool cleft_const = true, cright_const = true; 
-    if(cleft)  cleft_const  = diff_tree_subtree_holds_var(cleft);
-    if(cright) cright_const = diff_tree_subtree_holds_var(cright);
+    bool left_has_var = true, right_has_val = true; 
+    if(left)  left_has_var  = diff_tree_subtree_holds_var(left);
+    if(right) right_has_val = diff_tree_subtree_holds_var(right);
 
-    if(!cleft_const && !cright_const) {
+    if(!left_has_var && !right_has_val) {
         DiffTreeNode* new_node 
             = CONST_(diff_tree_evaluate_op(dtree, node));
         

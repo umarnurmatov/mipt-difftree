@@ -111,20 +111,17 @@ int main(int argc, char* argv[])
 
     diff_tree_dump_latex(&dtree, dtree.root->left);
 
-    diff_tree_optimize(&dtree);
-
     DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
-    diff_tree_differentiate_tree(&dtree, (Variable*)vector_at(&dtree.vars,0));
+    diff_tree_taylor_expansion(&dtree, (Variable*)vector_at(&dtree.vars, 0), 10, 2);
 
-    diff_tree_optimize(&dtree);
+    // diff_tree_differentiate_tree_n(&dtree, (Variable*)vector_at(&dtree.vars,0), 1);
 
     DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
     diff_tree_dump_latex(&dtree, dtree.root->left);
 
-    ((Variable*)vector_at(&dtree.vars, 0))->val = 10;
-    ((Variable*)vector_at(&dtree.vars, 1))->val = 20;
+    ((Variable*)vector_at(&dtree.vars, 0))->val = 1;
 
     UTILS_LOGI(LOG_CATEGORY_APP, "evaluated: %f\n", diff_tree_evaluate_tree(&dtree));
 
