@@ -78,7 +78,7 @@ VectorErr vector_push(Vector* vec, void* val)
             return err;
         }
     }
-    UTILS_LOGD(LOG_CATEGORY_VEC, "%p %p", val, *(DiffTreeNode**)val);
+
     memcpy(vector_at(vec, vec->size++), val, vec->tsize);
 
     IF_DEBUG(
@@ -114,15 +114,20 @@ VectorErr vector_pop(Vector* vec, void** val)
 
 static VectorErr vector_realloc_(Vector* vec, size_t capacity)
 {
-    vec->buffer = realloc(
+    utils_assert(vec);
+
+    void* buf_tmp = realloc(
         vec->buffer, 
         capacity * vec->tsize);
 
-    if(!vec->buffer)
+    if(!buf_tmp) {
+        free(vec->buffer);
         return VECTOR_ERR_ALLOC_FAIL;
+    }
 
-    memset((char*)vec->buffer + vec->size * vec->tsize, 0, vec->capacity - vec->size);
+    memset((char*)buf_tmp + vec->size * vec->tsize, 0, (vec->capacity - vec->size) * vec->tsize);
 
+    vec->buffer = buf_tmp;
     vec->capacity = capacity;
 
     return VECTOR_ERR_NONE;
