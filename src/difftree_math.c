@@ -210,6 +210,28 @@ static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, A
     return CONST_(0);
 }
 
+DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0, size_t n)
+{
+    utils_assert(dtree);
+    utils_assert(var);
+
+    // sum{ (df^(n)/dx^n)(x0)(x-x0)^k/(k!)}
+    var->val = x0;
+    for(size_t k = 0; k < n; ++k) {
+        diff_tree_differentiate_tree_n(dtree, var, 1);
+
+        double derivative = diff_tree_evaluate_tree(dtree);
+        double k_fact = (double)utils_i64_factorial(k);
+        DiffTreeNode* term = MUL_(DIV_(CONST_(derivative), CONST_(k_fact)), POW_(SUB_(VAR_(var), CONST_(x0)), CONST_(k)));
+
+        // dump here
+
+        diff_tree_mark_to_delete(dtree, term);
+    }
+
+    return DIFF_TREE_ERR_NONE;
+}
+
 #undef dR
 #undef dL
 #undef cR

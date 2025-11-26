@@ -15,3 +15,5 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node);
 
 
 bool diff_tree_subtree_holds_var(DiffTreeNode* node);
+
+DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0, size_t n);
