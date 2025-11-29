@@ -27,10 +27,20 @@ static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double 
 
 DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n)
 {
+    diff_tree_dump_latex("Исходное выражение имеет вид");
+    diff_tree_dump_latex("\\begin{dmath}\n");
+    diff_tree_dump_node_latex(dtree, dtree->root->left);
+    diff_tree_dump_latex("\n\\end{dmath}\n\n");
+
     diff_tree_optimize(dtree);
     for(size_t i = 0; i < n; ++i) {
         dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
         diff_tree_optimize(dtree);
+
+        diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим");
+        diff_tree_dump_latex("\\begin{dmath}\n");
+        diff_tree_dump_node_latex(dtree, dtree->root->left);
+        diff_tree_dump_latex("\n\\end{dmath}\n\n");
     }
     return DIFF_TREE_ERR_NONE;
 }
@@ -89,6 +99,7 @@ DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Varia
     utils_assert(node);
     utils_assert(var);
 
+
     DiffTreeNode* new_node = NULL;
 
     switch(node->type) {
@@ -116,7 +127,14 @@ DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Varia
             node->parent->right = new_node;
     }
 
-    diff_tree_dump_latex(dtree, new_node);
+    diff_tree_dump_randphrase_latex();
+    diff_tree_dump_latex("\\begin{dmath}\n");
+    diff_tree_dump_latex("\\frac{d}{dx} \\left (");
+    diff_tree_dump_node_latex(dtree, node);
+    diff_tree_dump_latex("\\right ) = ");
+    diff_tree_dump_node_latex(dtree, new_node);
+    diff_tree_dump_latex("\n\\end{dmath}\n\n");
+
     DIFF_TREE_DUMP_NODE(dtree, new_node, DIFF_TREE_ERR_NONE);
 
     diff_tree_mark_to_delete(dtree, node);
@@ -135,7 +153,11 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
         case OPERATOR_TYPE_SUB:
             return SUB_(dL, dR);
         case OPERATOR_TYPE_DIV:
-            return DIV_(ADD_(MUL_(dL, cR), MUL_(cL, dR)), POW_(cR, CONST_(2)));
+            if(diff_tree_subtree_holds_var(node->right))
+                return DIV_(ADD_(MUL_(dL, cR), MUL_(cL, dR)), POW_(cR, CONST_(2)));
+            else 
+                return DIV_(dL, cR);
+
         case OPERATOR_TYPE_MUL:
             return ADD_(MUL_(dL, cR), MUL_(cL, dR));
         case OPERATOR_TYPE_POW:
@@ -216,6 +238,7 @@ DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0
     utils_assert(var);
 
     // sum{ (df^(n)/dx^n)(x0)(x-x0)^k/(k!)}
+    
     var->val = x0;
     for(size_t k = 0; k < n; ++k) {
         diff_tree_differentiate_tree_n(dtree, var, 1);

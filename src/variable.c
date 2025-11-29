@@ -10,8 +10,8 @@ void variable_print_callback(FILE* stream, void* var)
 
     Variable* var_ = (Variable*)var;
     fprintf(stream, 
-            "[str: %s; hash: %lu; val: %f]", 
-            var_->str,
+            "[str: %c; hash: %lu; val: %f]", 
+            var_->c,
             var_->hash,
             var_->val
            );

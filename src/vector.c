@@ -3,9 +3,7 @@
 #include <assert.h>
 #include <memory.h>
 
-#include "difftree.h"
 #include "logutils.h"
-#include "sortutils.h"
 #include "assertutils.h"
 
 static const size_t   CAPACITY_EXP          = 2;

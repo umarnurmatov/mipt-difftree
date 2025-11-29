@@ -5,7 +5,7 @@
 
 typedef struct Variable
 {
-    char* str;
+    char c;
     utils_hash_t hash;
     double val;
 

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "stringutils.h"
 #include "vector.h"
 #include "types.h"
 #include "variable.h"
@@ -82,7 +81,11 @@ Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash);
 
 void diff_tree_mark_to_delete(DiffTree* dtree, DiffTreeNode* node);
 
-void diff_tree_dump_latex(DiffTree* tree, DiffTreeNode* node);
+void diff_tree_dump_latex(const char* str);
+
+void diff_tree_dump_randphrase_latex();
+
+void diff_tree_dump_node_latex(DiffTree* dtree, DiffTreeNode* node);
 
 #ifdef _DEBUG 
 

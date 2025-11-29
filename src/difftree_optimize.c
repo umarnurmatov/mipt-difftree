@@ -1,9 +1,9 @@
 #include "difftree_optimize.h"
 
+#include "difftree_math.h"
 #include "assertutils.h"
 #include "difftree.h"
 #include "floatutils.h"
-#include "logutils.h"
 #include "types.h"
 #include "utils.h"
 
