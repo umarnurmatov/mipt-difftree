@@ -787,9 +787,14 @@ void diff_tree_dump_randphrase_latex()
     fprintf(file_tex, "%s\n", phrases[(unsigned) rand() % SIZEOF(phrases)]);
 }
 
-void diff_tree_dump_latex(const char* str)
+void diff_tree_dump_latex(const char* fmt, ...)
 {
     fprintf(file_tex, "%s", str);
+    va_list va_arg_list;
+    va_start(va_arg_list, fmt);
+    vfprintf(file_tex, fmt, va_arg_list);
+    va_end(va_arg_list);
+}
 }
 
 #ifdef _DEBUG

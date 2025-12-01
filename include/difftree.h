@@ -84,7 +84,8 @@ Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash);
 
 void diff_tree_mark_to_delete(DiffTree* dtree, DiffTreeNode* node);
 
-void diff_tree_dump_latex(const char* str);
+void diff_tree_dump_latex(const char* fmt, ...)
+    __attribute__((format(printf, 1, 2)));
 
 void diff_tree_dump_randphrase_latex();
 
