@@ -149,9 +149,8 @@ DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Varia
         diff_tree_dump_latex("\\right ) = ");
         diff_tree_dump_node_latex(dtree, new_node);
         diff_tree_dump_end_math();
+        DIFF_TREE_DUMP(dtree, DIFF_TREE_ERR_NONE);
     }
-
-    DIFF_TREE_DUMP(dtree, DIFF_TREE_ERR_NONE);
 
     diff_tree_mark_to_delete(dtree, node);
 
