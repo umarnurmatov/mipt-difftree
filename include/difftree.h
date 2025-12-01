@@ -91,6 +91,12 @@ void diff_tree_dump_randphrase_latex();
 
 void diff_tree_dump_node_latex(DiffTree* dtree, DiffTreeNode* node);
 
+void diff_tree_dump_begin_math();
+
+void diff_tree_dump_end_math();
+
+void diff_tree_dump_graph_latex(DiffTree* dtree, double x_begin, double x_end, double x_step);
+
 #ifdef _DEBUG 
 
 void diff_tree_dump(DiffTree* diff_tree, DiffTreeNode* node, DiffTreeErr err, const char* msg, const char* file, int line, const char* funcname);

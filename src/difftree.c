@@ -684,6 +684,8 @@ static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
         "\\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}\n"
         "\\usepackage{breqn}\n"
         "\\usepackage{hyperref}\n"
+        "\\usepackage{pgfplots}\n"
+        "\\pgfplotsset{compat=1.18}\n"
         "\\breqnsetup{breakdepth={1}}\n"
         "\\title{Дифференциальное исчисление на простейших примерах}\n"
         "\\author{Нурматов Умархон Акмалович, д.т.н, д.ф.-м.н.}\n"
@@ -724,12 +726,12 @@ static bool diff_tree_node_need_parentheses_(DiffTreeNode* node)
     int parent_precedance = get_operator(node->parent->value.op_type)->precedance;
 
     if (parent_precedance > node_precedance)
-        return false;
+        return true;
 
     if(parent_precedance == node_precedance)
         if((node->parent->value.op_type == OPERATOR_TYPE_SUB ||
            node->parent->value.op_type == OPERATOR_TYPE_POW) &&
-           node == node->parent->right)
+           node == node->parent->left)
             return true;
 
     return false;
@@ -757,14 +759,7 @@ void diff_tree_dump_node_latex(DiffTree* dtree, DiffTreeNode* node)
             fprintf(file_tex, " %s ", get_operator(node->value.op_type)->latex_str_inf);
             break;
         case NODE_TYPE_NUM:
-        {
-            double val = node->value.num;
-            if(utils_equal_with_precision(val, floor(val)))
-                fprintf(file_tex, " %ld ", (long) val);
-            else
-                fprintf(file_tex, " %f ", node->value.num);
-            break;
-        }
+            fprintf(file_tex, " %g ", node->value.num);
         case NODE_TYPE_FAKE:
             UTILS_LOGW(LOG_CTG_DIFF_TREE, "fake node occured");
             break;
@@ -789,12 +784,48 @@ void diff_tree_dump_randphrase_latex()
 
 void diff_tree_dump_latex(const char* fmt, ...)
 {
-    fprintf(file_tex, "%s", str);
     va_list va_arg_list;
     va_start(va_arg_list, fmt);
     vfprintf(file_tex, fmt, va_arg_list);
     va_end(va_arg_list);
 }
+
+void diff_tree_dump_begin_math()
+{
+    diff_tree_dump_latex("\\begin{dmath}\n");
+}
+
+void diff_tree_dump_end_math()
+{
+    diff_tree_dump_latex("\\end{dmath}\n\n");
+}
+
+void diff_tree_dump_graph_latex(DiffTree* dtree, double x_begin, double x_end, double x_step)
+{
+    fprintf(file_tex,
+        "\\begin{tikzpicture}\n"
+        "\\begin{axis}[\n"
+            "xlabel={X},\n"
+            "ylabel={Y},\n"
+            "grid=major,\n"
+            "legend pos=north west\n"
+        "]\n\n"
+        "\\addplot[\n"
+        "    mark size=0pt,\n"
+        "    color=blue\n"
+        "] coordinates {\n");
+
+    for(double x = x_begin; x < x_end; x += x_step) {
+        ((Variable*)vector_at(&dtree->vars, 0))->val = x;
+        double val = diff_tree_evaluate_tree(dtree);
+        fprintf(file_tex, "(%f,%f)\n", x, val);
+    }
+
+    fprintf(file_tex, 
+        "};\n"
+        "\\end{axis}\n"
+        "\\end{tikzpicture}\n");
+
 }
 
 #ifdef _DEBUG
