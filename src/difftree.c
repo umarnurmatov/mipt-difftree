@@ -313,9 +313,9 @@ DiffTreeNode* diff_tree_parse_get_number_(DiffTree* dtree)
     ssize_t pos_prev = dtree->buf.pos;
     DiffTreeNode* node = NULL;
 
-    while('0' <= BUF_AT_POS_ && BUF_AT_POS_ < '9') {
+    while('0' <= BUF_AT_POS_ && BUF_AT_POS_ <= '9') {
         val = (BUF_AT_POS_ - '0') + val * 10;
-        diff_tree_advance_buf_pos_(dtree);
+        INCREMENT_POS_;
     }
 
     if(pos_prev != POS_) {
