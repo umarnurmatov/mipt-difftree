@@ -91,23 +91,16 @@ static DiffTreeNode* diff_tree_eliminate_neutral_(DiffTree* dtree, DiffTreeNode*
     if(node->right)
         right = diff_tree_eliminate_neutral_(dtree, node->right);
 
-    switch(node->value.op_type)
-    {
-        case OPERATOR_TYPE_MUL:
-            new_node = 
-                diff_tree_eliminate_neutral_mul_(dtree, node, left, right);
-            break;
-        case OPERATOR_TYPE_ADD:
-            new_node = 
-                diff_tree_eliminate_neutral_add_(dtree, node, left, right);
-            break;
-        case OPERATOR_TYPE_POW:
-            new_node = 
-                diff_tree_eliminate_neutral_pow_(dtree, node, left, right);
-            break;
-        default:
-            break;
-    }
+
+    if(node->value.op_type== OPERATOR_TYPE_MUL)
+        new_node = diff_tree_eliminate_neutral_mul_(dtree, node, left, right);
+
+    else if(node->value.op_type== OPERATOR_TYPE_ADD)
+        new_node = diff_tree_eliminate_neutral_add_(dtree, node, left, right);
+
+    else if(node->value.op_type== OPERATOR_TYPE_POW)
+        new_node = diff_tree_eliminate_neutral_pow_(dtree, node, left, right);
+
 
     if(new_node != node) {
         if(node->parent->left == node)

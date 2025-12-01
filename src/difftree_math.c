@@ -11,8 +11,6 @@
 #include "types.h"
 #include "operators.h"
 
-#pragma STDC FENV_ACCESS ON
-
 #define LOG_CTG_DMATH "DIFFTREE_MATH"
 
 static bool IS_FE_EXCEPTION_SET = false;
@@ -27,8 +25,8 @@ static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double 
 
 DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n)
 {
-    diff_tree_dump_latex("Исходное выражение имеет вид");
-    diff_tree_dump_latex("\\begin{dmath}\n");
+    diff_tree_dump_latex("Исходное выражение имеет вид"
+                         "\\begin{dmath}\n");
     diff_tree_dump_node_latex(dtree, dtree->root->left);
     diff_tree_dump_latex("\n\\end{dmath}\n\n");
 
@@ -37,8 +35,8 @@ DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_
         dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
         diff_tree_optimize(dtree);
 
-        diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим");
-        diff_tree_dump_latex("\\begin{dmath}\n");
+        diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим"
+                             "\\begin{dmath}\n");
         diff_tree_dump_node_latex(dtree, dtree->root->left);
         diff_tree_dump_latex("\n\\end{dmath}\n\n");
     }
@@ -114,6 +112,10 @@ DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Varia
         case NODE_TYPE_NUM:
             new_node = diff_tree_differentiate_num_(dtree, node, var);
             break;
+
+        case NODE_TYPE_FAKE:
+            UTILS_LOGE(LOG_CTG_DMATH, "fake node occured");
+            return NULL;
 
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown node type %d", node->type);
@@ -207,6 +209,9 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
             return DIV_(dL, ADD_(CONST_(1), POW_(cL, CONST_(2))));
         case OPERATOR_TYPE_ACTG:
             return MUL_(CONST_(-1), DIV_(dL, ADD_(CONST_(1), POW_(cL, CONST_(2)))));
+        case OPERATOR_TYPE_NONE:
+            UTILS_LOGE(LOG_CTG_DMATH, "operator NONE occured");
+            return NULL;
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown operator %d", node->value.op_type);
             return NULL;
@@ -245,7 +250,10 @@ DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0
 
         double derivative = diff_tree_evaluate_tree(dtree);
         double k_fact = (double)utils_i64_factorial(k);
-        DiffTreeNode* term = MUL_(DIV_(CONST_(derivative), CONST_(k_fact)), POW_(SUB_(VAR_(var), CONST_(x0)), CONST_(k)));
+        DiffTreeNode* term = MUL_(
+            DIV_(CONST_(derivative), CONST_(k_fact)), 
+            POW_(SUB_(VAR_(var), CONST_(x0)), CONST_((double)k))
+        );
 
         // dump here
 
@@ -393,6 +401,9 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
             CHECK_MATH_ERR;
             res = 1.f / res;
             CHECK_MATH_ERR_AND_RET;
+        case OPERATOR_TYPE_NONE:
+            UTILS_LOGE(LOG_CTG_DMATH, "operator NONE occured");
+            return NAN;
         default:
             UTILS_LOGE(LOG_CTG_DMATH, "unknown operator %d", node->value.op_type);
             return NAN;

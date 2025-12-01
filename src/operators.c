@@ -1,5 +1,9 @@
 #include "operators.h"
+
+#include <string.h>
+
 #include "assertutils.h"
+#include "logutils.h"
 
 int operators_prepare_op_arr()
 {                                                                                       
@@ -35,4 +39,21 @@ const Operator* get_operator(OperatorType op_type)
     utils_assert((unsigned)op_type < SIZEOF(op_arr));
 
     return &op_arr[(unsigned)op_type];
+}
+
+
+const Operator* match_function(char* str)
+{
+    utils_assert(str);
+
+    // FIXME make hash comparasion
+    for(size_t i = 0; i < SIZEOF(op_arr); ++i) {
+        if(!strcmp(str, op_arr[i].str) 
+            && op_arr[i].argnum == OPERATOR_ARGNUM_1) {
+
+            return op_arr + i;
+        }
+    }
+
+    return NULL;
 }

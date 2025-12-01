@@ -14,7 +14,8 @@
         .buf = {                      \
             .ptr = NULL,              \
             .len = 0,                 \
-            .pos = 0                  \
+            .pos = 0,                 \
+            .filename = NULL          \
         },                            \
         .vars = VECTOR_INITLIST,      \
         .to_delete = VECTOR_INITLIST  \
@@ -51,6 +52,7 @@ typedef struct DiffTree
         char* ptr;
         ssize_t len;
         ssize_t pos;
+        const char* filename;
     } buf;
 
     Vector vars;
