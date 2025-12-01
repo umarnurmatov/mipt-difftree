@@ -8,13 +8,13 @@
 #include <limits.h>
 #include <math.h>
 
+#include "difftree_math.h"
 #include "hashutils.h"
 #include "logutils.h"
 #include "memutils.h"
 #include "ioutils.h"
 #include "assertutils.h"
 #include "logutils.h"
-#include "floatutils.h"
 
 #include "operators.h"
 #include "types.h"
@@ -550,10 +550,10 @@ DiffTreeErr diff_tree_fread(DiffTree* dtree, const char* filename)
         for(size_t i = 0; i < dtree->to_delete.size; ++i)
             NFREE(*(DiffTreeNode**)vector_at(&dtree->to_delete, i));
 
-        vector_free(&dtree->to_delete);
-
         return err;
     }
+
+    vector_free(&dtree->to_delete);
 
     dtree->root = diff_tree_new_node(NODE_TYPE_FAKE, NodeValue { .num = NAN }, 
                                      dtree->root, NULL, NULL);
