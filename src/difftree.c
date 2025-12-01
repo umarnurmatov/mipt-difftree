@@ -683,11 +683,13 @@ static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
         "\\usepackage[english,russian]{babel}\n"
         "\\usepackage{amsmath,amsfonts,amssymb,amsthm,mathtools}\n"
         "\\usepackage{breqn}\n"
-        "\\breqnsetup{breakdepth={3}}"
-        "\\title{Дифференциальное исчисление на простейших примерах}"
-        "\\author{Нурматов Умархон Акмалович, д.т.н, д.ф.-м.н.}"
+        "\\usepackage{hyperref}\n"
+        "\\breqnsetup{breakdepth={1}}\n"
+        "\\title{Дифференциальное исчисление на простейших примерах}\n"
+        "\\author{Нурматов Умархон Акмалович, д.т.н, д.ф.-м.н.}\n"
         "\\begin{document}\n\n"
-        "\\maketitle"
+        "\\maketitle\n"
+        "\\tableofcontents\n"
     );
 
     return DIFF_TREE_ERR_NONE;
@@ -782,7 +784,7 @@ void diff_tree_dump_node_latex(DiffTree* dtree, DiffTreeNode* node)
 
 void diff_tree_dump_randphrase_latex()
 {
-    fprintf(file_tex, "%s\n", phrases[(unsigned) rand() % (SIZEOF(phrases) - 1)]);
+    fprintf(file_tex, "%s\n", phrases[(unsigned) rand() % SIZEOF(phrases)]);
 }
 
 void diff_tree_dump_latex(const char* str)

@@ -52,6 +52,8 @@ int main(int argc, char* argv[])
     DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
     // diff_tree_taylor_expansion(&dtree, (Variable*)vector_at(&dtree.vars, 0), 10, 2);
+    
+    diff_tree_dump_latex("\\section{Производная}\n");
 
     diff_tree_differentiate_tree_n(&dtree, (Variable*)vector_at(&dtree.vars,0), 1);
 
@@ -64,6 +66,10 @@ int main(int argc, char* argv[])
         if(input_double_until_correct(&var->val) != IO_ERR_NONE)
             return EXIT_FAILURE;
     }
+
+    diff_tree_dump_latex("\\section{Разложение в ряд Тейлора}\n");
+
+    diff_tree_dump_latex("\\section{График}\n");
 
     UTILS_LOGI(LOG_CATEGORY_APP, "evaluated: %f\n", diff_tree_evaluate_tree(&dtree));
 
