@@ -109,6 +109,10 @@ VectorErr vector_pop(Vector* vec, void** val)
     return err;
 }
 
+void vector_free(Vector* vec)
+{
+    vec->size = 0;
+}
 
 static VectorErr vector_realloc_(Vector* vec, size_t capacity)
 {

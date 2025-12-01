@@ -53,6 +53,7 @@ typedef struct DiffTree
         ssize_t len;
         ssize_t pos;
         const char* filename;
+        Vector nodes;
     } buf;
 
     Vector vars;

@@ -73,6 +73,8 @@ void* vector_at(Vector* vec, size_t ind);
 
 VectorErr vector_pop(Vector* vec, void** val);
 
+void vector_free(Vector* vec);
+
 void vector_dtor(Vector* vec);
 
 const char* vector_strerr(const VectorErr err);

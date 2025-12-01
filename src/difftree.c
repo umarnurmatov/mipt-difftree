@@ -57,6 +57,8 @@ static int diff_tree_advance_buf_pos_(DiffTree* dtree);
 
 static void diff_tree_skip_spaces_(DiffTree* dtree);
 
+ATTR_UNUSED static void diff_tree_print_node_ptr_(FILE* file, void* ptr);
+
 static bool diff_tree_node_need_parentheses_(DiffTreeNode* node);
 
 static DiffTreeErr diff_tree_init_latex_file_(const char* filename);
@@ -92,8 +94,9 @@ DiffTreeErr diff_tree_verify_(DiffTree* diff_tree);
 
 #endif // _DEBUG
 
-#define DEFAULT_VAR_VECTOR_CAPACITY 10
+#define DEFAULT_VAR_VECTOR_CAPACITY       10
 #define DEFAULT_TO_DELETE_VECTOR_CAPACITY 10
+#define DEFAULT_NODES_VECTOR_CAPACITY     10
 
 DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
 {
@@ -217,6 +220,11 @@ void diff_tree_skip_spaces_(DiffTree* dtree)
     }
 }
 
+static void diff_tree_print_node_ptr_(FILE* file, void* ptr)
+{
+    fprintf(file, "%p", *(DiffTreeNode**)ptr);
+}
+
 DiffTreeErr diff_tree_scan_node_name_(DiffTree* dtree)
 {
     DIFF_TREE_ASSERT_OK_(dtree);
@@ -271,7 +279,7 @@ Variable* diff_tree_find_variable(DiffTree* dtree, utils_hash_t hash)
 
 #define LEN_ dtree->buf.len
 
-#define INCREMENT_POS_                      \
+#define INCREMENT_POS_                 \
     diff_tree_advance_buf_pos_(dtree); \
     diff_tree_skip_spaces_(dtree);     
 
@@ -303,16 +311,19 @@ DiffTreeNode* diff_tree_parse_get_number_(DiffTree* dtree)
 
     int val = 0;
     ssize_t pos_prev = dtree->buf.pos;
+    DiffTreeNode* node = NULL;
 
     while('0' <= BUF_AT_POS_ && BUF_AT_POS_ < '9') {
         val = (BUF_AT_POS_ - '0') + val * 10;
         diff_tree_advance_buf_pos_(dtree);
     }
 
-    if(pos_prev == POS_)
-        return NULL;
+    if(pos_prev != POS_) {
+        node = CONST_(val);
+        diff_tree_mark_to_delete(dtree, node);
+    }
 
-    return CONST_(val);
+    return node;
 }
 
 DiffTreeNode* diff_tree_parse_get_var_(DiffTree* dtree)
@@ -321,6 +332,7 @@ DiffTreeNode* diff_tree_parse_get_var_(DiffTree* dtree)
 
     ssize_t pos_prev = dtree->buf.pos;
     Variable var = { .c = ' ', .hash = 0, .val = 0 };
+    DiffTreeNode* node = NULL;
 
     if(isalpha(BUF_AT_POS_)) {
         var.c = BUF_AT_POS_;
@@ -330,15 +342,16 @@ DiffTreeNode* diff_tree_parse_get_var_(DiffTree* dtree)
 
         INCREMENT_POS_;
 
-        return diff_tree_new_node(
+        node = diff_tree_new_node(
                 NODE_TYPE_VAR, 
                 NodeValue { .var_hash = var.hash },
                 NULL,
                 NULL,
                 NULL );
+        diff_tree_mark_to_delete(dtree, node);
     }
 
-    return NULL;
+    return node;
 }
 
 DiffTreeNode* diff_tree_parse_get_expr_(DiffTree* dtree)
@@ -357,6 +370,8 @@ DiffTreeNode* diff_tree_parse_get_expr_(DiffTree* dtree)
             node = ADD_(node, node_new);
         else
             node = SUB_(node, node_new);
+
+        diff_tree_mark_to_delete(dtree, node);
     }
 
     // if(pos_prev == POS_) {
@@ -382,6 +397,8 @@ DiffTreeNode* diff_tree_parse_get_mul_div_(DiffTree* dtree)
             node = MUL_(node, node_right);
         else
             node = DIV_(node, node_right);
+
+        diff_tree_mark_to_delete(dtree, node);
     }
     
     return node;
@@ -400,6 +417,7 @@ DiffTreeNode* diff_tree_parse_get_pow_(DiffTree* dtree)
         DiffTreeNode* node_new = diff_tree_parse_get_primary_(dtree);
 
         node = POW_(node, node_new);
+        diff_tree_mark_to_delete(dtree, node);
     }
     
     // if(pos_prev == POS_) {
@@ -416,7 +434,9 @@ DiffTreeNode* diff_tree_parse_get_func_(DiffTree* dtree)
 
     ssize_t bufpos = 0;
     char buf[MAX_OP_NAME_LEN] = "";
+
     ssize_t pos_prev = POS_;
+    DiffTreeNode* node = NULL;
 
     while(POS_ < LEN_ && isalpha(BUF_AT_POS_)) {
         buf[bufpos++] = BUF_AT_POS_;
@@ -432,14 +452,15 @@ DiffTreeNode* diff_tree_parse_get_func_(DiffTree* dtree)
     if(BUF_AT_POS_ == '(') {
         INCREMENT_POS_;
 
-        DiffTreeNode* node = diff_tree_parse_get_expr_(dtree);
+        node = diff_tree_parse_get_expr_(dtree);
 
         INCREMENT_POS_;
 
-        return diff_tree_new_node(NODE_TYPE_OP, NodeValue { .op_type = op->type }, node, NULL, NULL);
+        node = diff_tree_new_node(NODE_TYPE_OP, NodeValue { .op_type = op->type }, node, NULL, NULL);
+        diff_tree_mark_to_delete(dtree, node);
     }
     
-    return NULL;
+    return node;
 }
 
 DiffTreeNode* diff_tree_parse_get_primary_(DiffTree* dtree)
@@ -450,7 +471,9 @@ DiffTreeNode* diff_tree_parse_get_primary_(DiffTree* dtree)
 
     if(BUF_AT_POS_ == '(') {
         INCREMENT_POS_;
+
         node = diff_tree_parse_get_expr_(dtree);
+
         INCREMENT_POS_;
 
         return node;
@@ -463,9 +486,8 @@ DiffTreeNode* diff_tree_parse_get_primary_(DiffTree* dtree)
     if(node) return node;
 
     node = diff_tree_parse_get_var_(dtree);
-    if(node) return node;
 
-    return NULL;
+    return node;
 }
 
 DiffTreeNode* diff_tree_parse_get_general_(DiffTree* dtree)
@@ -524,6 +546,12 @@ DiffTreeErr diff_tree_fread(DiffTree* dtree, const char* filename)
     if(!dtree->root) {
         err = DIFF_TREE_SYNTAX_ERR;
         DIFF_TREE_DUMP(dtree, err);
+        
+        for(size_t i = 0; i < dtree->to_delete.size; ++i)
+            NFREE(*(DiffTreeNode**)vector_at(&dtree->to_delete, i));
+
+        vector_free(&dtree->to_delete);
+
         return err;
     }
 
