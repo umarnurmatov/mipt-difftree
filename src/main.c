@@ -51,8 +51,6 @@ int main(int argc, char* argv[])
 
     DIFF_TREE_DUMP(&dtree, DIFF_TREE_ERR_NONE);
 
-    // diff_tree_taylor_expansion(&dtree, (Variable*)vector_at(&dtree.vars, 0), 10, 2);
-    
     diff_tree_dump_latex("\\section{Производная}\n");
 
     diff_tree_differentiate_tree_n(&dtree, (Variable*)vector_at(&dtree.vars,0), 1);
@@ -67,9 +65,18 @@ int main(int argc, char* argv[])
             return EXIT_FAILURE;
     }
 
-    diff_tree_dump_latex("\\section{Разложение в ряд Тейлора}\n");
+    size_t power = 4;
+
+    diff_tree_dump_latex(
+        "\\section{Разложение в ряд Тейлора}\n"
+        "Разложем данную функцию в ряд Тейлора до $o((x-x_0)^%lu)$\n",
+        power);
+
+    diff_tree_taylor_expansion(&dtree, (Variable*)vector_at(&dtree.vars, 0), 10, power);
 
     diff_tree_dump_latex("\\section{График}\n");
+
+    diff_tree_dump_graph_latex(&dtree, 0, 5, 0.1);
 
     UTILS_LOGI(LOG_CATEGORY_APP, "evaluated: %f\n", diff_tree_evaluate_tree(&dtree));
 

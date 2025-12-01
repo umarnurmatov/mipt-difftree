@@ -14,6 +14,7 @@
 #define LOG_CTG_DMATH "DIFFTREE_MATH"
 
 static bool IS_FE_EXCEPTION_SET = false;
+static bool IS_DUMP_ENABLED = true;
 
 static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 static DiffTreeNode* diff_tree_differentiate_var_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
@@ -23,22 +24,33 @@ static const char* diff_tree_get_fe_exception_str(void);
 
 static void diff_tree_check_math_errors(DiffTreeNode* node, double left, double right);
 
+void diff_tree_set_latex_dump_enabled(bool enabled)
+{
+    IS_DUMP_ENABLED = enabled;
+}
+
 DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n)
 {
-    diff_tree_dump_latex("Исходное выражение имеет вид"
-                         "\\begin{dmath}\n");
-    diff_tree_dump_node_latex(dtree, dtree->root->left);
-    diff_tree_dump_latex("\n\\end{dmath}\n\n");
+    if(IS_DUMP_ENABLED) {
+        diff_tree_dump_latex("Исходное выражение имеет вид"
+                             "\\begin{dmath}\n");
+        diff_tree_dump_node_latex(dtree, dtree->root->left);
+        diff_tree_dump_latex("\n\\end{dmath}\n\n");
+    }
 
     diff_tree_optimize(dtree);
     for(size_t i = 0; i < n; ++i) {
         dtree->root->left = diff_tree_differentiate(dtree, dtree->root->left, var);
+        dtree->root->left->parent = dtree->root;
+
         diff_tree_optimize(dtree);
 
-        diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим"
-                             "\\begin{dmath}\n");
-        diff_tree_dump_node_latex(dtree, dtree->root->left);
-        diff_tree_dump_latex("\n\\end{dmath}\n\n");
+        if(IS_DUMP_ENABLED) {
+            diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим\n");
+            diff_tree_dump_begin_math();
+            diff_tree_dump_node_latex(dtree, dtree->root->left);
+            diff_tree_dump_end_math();
+        }
     }
     return DIFF_TREE_ERR_NONE;
 }
@@ -129,15 +141,17 @@ DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Varia
             node->parent->right = new_node;
     }
 
-    diff_tree_dump_randphrase_latex();
-    diff_tree_dump_latex("\\begin{dmath}\n");
-    diff_tree_dump_latex("\\frac{d}{dx} \\left (");
-    diff_tree_dump_node_latex(dtree, node);
-    diff_tree_dump_latex("\\right ) = ");
-    diff_tree_dump_node_latex(dtree, new_node);
-    diff_tree_dump_latex("\n\\end{dmath}\n\n");
+    if(IS_DUMP_ENABLED) {
+        diff_tree_dump_randphrase_latex();
+        diff_tree_dump_begin_math();
+        diff_tree_dump_latex("\\frac{d}{dx} \\left (");
+        diff_tree_dump_node_latex(dtree, node);
+        diff_tree_dump_latex("\\right ) = ");
+        diff_tree_dump_node_latex(dtree, new_node);
+        diff_tree_dump_end_math();
+    }
 
-    DIFF_TREE_DUMP_NODE(dtree, new_node, DIFF_TREE_ERR_NONE);
+    DIFF_TREE_DUMP(dtree, DIFF_TREE_ERR_NONE);
 
     diff_tree_mark_to_delete(dtree, node);
 
@@ -244,21 +258,37 @@ DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0
 
     // sum{ (df^(n)/dx^n)(x0)(x-x0)^k/(k!)}
     
+    diff_tree_set_latex_dump_enabled(false);
+    diff_tree_dump_begin_math();
+    
+
     var->val = x0;
-    for(size_t k = 0; k < n; ++k) {
+
+    double f = diff_tree_evaluate_tree(dtree);
+    DiffTreeNode* term = CONST_(f);
+    diff_tree_dump_node_latex(dtree, term);
+    diff_tree_mark_to_delete(dtree, term);
+
+    for(size_t k = 1; k <= n; ++k) {
+        diff_tree_dump_latex("+");
+
         diff_tree_differentiate_tree_n(dtree, var, 1);
 
         double derivative = diff_tree_evaluate_tree(dtree);
         double k_fact = (double)utils_i64_factorial(k);
-        DiffTreeNode* term = MUL_(
+        term = MUL_(
             DIV_(CONST_(derivative), CONST_(k_fact)), 
             POW_(SUB_(VAR_(var), CONST_(x0)), CONST_((double)k))
         );
-
-        // dump here
-
+        
+        diff_tree_dump_node_latex(dtree, term);
         diff_tree_mark_to_delete(dtree, term);
     }
+
+    diff_tree_dump_latex("+o((x-%g)^%lu)", x0, n);
+
+    diff_tree_dump_end_math();
+    diff_tree_set_latex_dump_enabled(true);
 
     return DIFF_TREE_ERR_NONE;
 }

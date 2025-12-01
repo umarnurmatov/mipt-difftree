@@ -1,6 +1,8 @@
 #pragma once
 #include "difftree.h"
 
+void diff_tree_set_latex_dump_enabled(bool enabled);
+
 DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n);
 
 DiffTreeNode* diff_tree_differentiate(DiffTree* dtree, DiffTreeNode* node, Variable* var);
