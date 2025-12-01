@@ -722,16 +722,19 @@ static bool diff_tree_node_need_parentheses_(DiffTreeNode* node)
        node->parent->value.op_type == OPERATOR_TYPE_SQRT)
         return false;
 
-    int node_precedance = get_operator(node->value.op_type)->precedance;
-    int parent_precedance = get_operator(node->parent->value.op_type)->precedance;
+    const Operator* op_node = get_operator(node->value.op_type);
+    const Operator* op_parent = get_operator(node->parent->value.op_type);
 
-    if (parent_precedance > node_precedance)
+    if(op_node->argnum == OPERATOR_ARGNUM_1 && op_parent->type == OPERATOR_TYPE_POW)
         return true;
 
-    if(parent_precedance == node_precedance)
+    if(op_parent->precedance > op_node->precedance)
+        return true;
+
+    if(op_parent->precedance == op_node->precedance)
         if((node->parent->value.op_type == OPERATOR_TYPE_SUB ||
            node->parent->value.op_type == OPERATOR_TYPE_POW) &&
-           node == node->parent->left)
+           node == node->parent->right)
             return true;
 
     return false;
