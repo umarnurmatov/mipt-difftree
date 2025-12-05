@@ -1,1 +1,1 @@
-(* (x nil nil)(+ (y nil nil) (6 nil nil)))
+sin(15*x^5+3)+(cos(10*x+9))^3

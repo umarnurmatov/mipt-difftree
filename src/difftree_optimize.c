@@ -11,7 +11,7 @@ ATTR_UNUSED static const char* LOG_CTG_DIFF_OPT = "DIFFTREE OPTIMIZE";
 
 static bool treeChanged = false;
 
-static DiffTreeNode* diff_tree_const_fold_(DiffTree* dtree, DiffTreeNode* node);
+static DiffTreeNode* diff_tree_const_fold_(DiffTree* dtree, DiffTreeNode* node, Variable* var);
 
 static DiffTreeNode* diff_tree_eliminate_neutral_(DiffTree* dtree, DiffTreeNode* node);
 
@@ -21,12 +21,12 @@ static DiffTreeNode* diff_tree_eliminate_neutral_add_(DiffTree* dtree, DiffTreeN
 
 static DiffTreeNode* diff_tree_eliminate_neutral_pow_(DiffTree* dtree, DiffTreeNode* node, DiffTreeNode* left, DiffTreeNode* right);
 
-void diff_tree_optimize(DiffTree *dtree)
+void diff_tree_optimize(DiffTree *dtree, Variable* var)
 {
     do {
 
         treeChanged = false;
-        diff_tree_const_fold_(dtree, dtree->root->left);
+        diff_tree_const_fold_(dtree, dtree->root->left, var);
         diff_tree_eliminate_neutral_(dtree, dtree->root->left);
 
     } while(treeChanged);
@@ -35,19 +35,19 @@ void diff_tree_optimize(DiffTree *dtree)
 #define CONST_(num_) \
     diff_tree_new_node(NODE_TYPE_NUM, NodeValue { .num = num_ }, NULL, NULL, node->parent)
 
-static DiffTreeNode* diff_tree_const_fold_(DiffTree* dtree, DiffTreeNode* node)
+static DiffTreeNode* diff_tree_const_fold_(DiffTree* dtree, DiffTreeNode* node, Variable* var)
 {
     DiffTreeNode *left = NULL, *right = NULL;
 
     if(node->left)
-        left = diff_tree_const_fold_(dtree, node->left);
+        left = diff_tree_const_fold_(dtree, node->left, var);
 
     if(node->right)
-        right = diff_tree_const_fold_(dtree, node->right);
+        right = diff_tree_const_fold_(dtree, node->right, var);
 
     bool left_has_var = true, right_has_val = true; 
-    if(left)  left_has_var  = diff_tree_subtree_holds_var(left);
-    if(right) right_has_val = diff_tree_subtree_holds_var(right);
+    if(left)  left_has_var  = diff_tree_subtree_holds_var(left, var);
+    if(right) right_has_val = diff_tree_subtree_holds_var(right, var);
 
     if(!left_has_var && !right_has_val) {
         DiffTreeNode* new_node 
@@ -92,7 +92,7 @@ static DiffTreeNode* diff_tree_eliminate_neutral_(DiffTree* dtree, DiffTreeNode*
         right = diff_tree_eliminate_neutral_(dtree, node->right);
 
 
-    if(node->value.op_type== OPERATOR_TYPE_MUL)
+    if(node->value.op_type == OPERATOR_TYPE_MUL)
         new_node = diff_tree_eliminate_neutral_mul_(dtree, node, left, right);
 
     else if(node->value.op_type== OPERATOR_TYPE_ADD)
@@ -129,8 +129,8 @@ static DiffTreeNode* diff_tree_eliminate_neutral_mul_(DiffTree* dtree, DiffTreeN
 
     DiffTreeNode* new_node = node;
 
-    if     (IS_VALUE_(left, 0.f))  new_node = CONST_(0.f);
-    else if(IS_VALUE_(left, 1.f))  new_node = cR;
+    if     (IS_VALUE_(left,  0.f)) new_node = CONST_(0.f);
+    else if(IS_VALUE_(left,  1.f)) new_node = cR;
     else if(IS_VALUE_(right, 0.f)) new_node = CONST_(0.f);
     else if(IS_VALUE_(right, 1.f)) new_node = cL;
 

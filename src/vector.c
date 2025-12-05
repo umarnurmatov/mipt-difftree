@@ -19,10 +19,13 @@ static VectorErr _vector_validate(Vector* vec);
 
 static utils_hash_t _vector_recalc_hashsum(Vector* vec);
 
-#define VECTOR_ASSERT_OK_(vec)                  \
-    {                                           \
-        err = _vector_validate(vec);            \
-        utils_assert(err == VECTOR_ERR_NONE);   \
+#define VECTOR_ASSERT_OK_(vec)                                      \
+    {                                                               \
+        err = _vector_validate(vec);                                \
+        if(err != VECTOR_ERR_NONE) {                                \
+            UTILS_LOGE(LOG_CATEGORY_VEC, "%s", vector_strerr(err)); \
+            utils_assert(err == VECTOR_ERR_NONE);                   \
+        }                                                           \
     }   
 
 #else
@@ -33,6 +36,19 @@ static utils_hash_t _vector_recalc_hashsum(Vector* vec);
 
 
 static VectorErr vector_realloc_(Vector* vec, size_t capacity);
+
+VectorErr vector_copy_from(Vector* from, Vector* to)
+{
+    to->tsize = from->tsize;
+    to->size = from->size;
+
+    VectorErr err = vector_realloc_(to, from->capacity);
+    err verified(return err);
+
+    memcpy(to->buffer, from->buffer, from->tsize * from->size);
+
+    return VECTOR_ERR_NONE;
+}
 
 VectorErr vector_ctor(Vector* vec, size_t capacity, size_t tsize)
 {
@@ -127,7 +143,7 @@ static VectorErr vector_realloc_(Vector* vec, size_t capacity)
         return VECTOR_ERR_ALLOC_FAIL;
     }
 
-    memset((char*)buf_tmp + vec->size * vec->tsize, 0, (vec->capacity - vec->size) * vec->tsize);
+    memset((char*)buf_tmp + vec->size * vec->tsize, 0, (capacity - vec->size) * vec->tsize);
 
     vec->buffer = buf_tmp;
     vec->capacity = capacity;

@@ -53,7 +53,6 @@ typedef struct DiffTree
         ssize_t len;
         ssize_t pos;
         const char* filename;
-        Vector nodes;
     } buf;
 
     Vector vars;
@@ -62,9 +61,15 @@ typedef struct DiffTree
 
 } DiffTree;
 
-DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename);
+DiffTreeErr diff_tree_ctor(DiffTree* diff_tree);
+
+DiffTreeErr diff_tree_copy_tree(DiffTree* from, DiffTree* to);
 
 void diff_tree_dtor(DiffTree* diff_tree);
+
+DiffTreeErr diff_tree_init_latex_file(const char* filename);
+
+void diff_tree_end_latex_file();
 
 const char* diff_tree_strerr(DiffTreeErr err);
 
@@ -96,6 +101,8 @@ void diff_tree_dump_begin_math();
 void diff_tree_dump_end_math();
 
 void diff_tree_dump_graph_latex(DiffTree* dtree, double x_begin, double x_end, double x_step);
+
+void diff_tree_dump_taylor_graph_latex(DiffTree* dtree, DiffTreeNode* taylor, double x_begin, double x_end, double x_step, double y_min, double y_max);
 
 #ifdef _DEBUG 
 

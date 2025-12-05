@@ -31,6 +31,8 @@ void diff_tree_set_latex_dump_enabled(bool enabled)
 
 DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_t n)
 {
+    DiffTreeNode* copy = diff_tree_copy_subtree(dtree, dtree->root, NULL);
+
     if(IS_DUMP_ENABLED) {
         diff_tree_dump_latex("Исходное выражение имеет вид"
                              "\\begin{dmath}\n");
@@ -48,10 +50,14 @@ DiffTreeErr diff_tree_differentiate_tree_n(DiffTree* dtree, Variable* var, size_
         if(IS_DUMP_ENABLED) {
             diff_tree_dump_latex("Итого, взяв производную от исходного выражения, получим\n");
             diff_tree_dump_begin_math();
+            diff_tree_dump_latex("\\frac{d}{dx} \\left (");
+            diff_tree_dump_node_latex(dtree, copy);
+            diff_tree_dump_latex("\\right ) = ");
             diff_tree_dump_node_latex(dtree, dtree->root->left);
             diff_tree_dump_end_math();
         }
     }
+    diff_tree_mark_to_delete(dtree, copy);
     return DIFF_TREE_ERR_NONE;
 }
 
@@ -168,7 +174,7 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
         case OPERATOR_TYPE_SUB:
             return SUB_(dL, dR);
         case OPERATOR_TYPE_DIV:
-            if(diff_tree_subtree_holds_var(node->right))
+            if(diff_tree_subtree_holds_var(node->right, var))
                 return DIV_(ADD_(MUL_(dL, cR), MUL_(cL, dR)), POW_(cR, CONST_(2)));
             else 
                 return DIV_(dL, cR);
@@ -177,8 +183,8 @@ static DiffTreeNode* diff_tree_differentiate_op_(DiffTree* dtree, DiffTreeNode* 
             return ADD_(MUL_(dL, cR), MUL_(cL, dR));
         case OPERATOR_TYPE_POW:
         {
-            bool left = diff_tree_subtree_holds_var(node->left);
-            bool right = diff_tree_subtree_holds_var(node->right);
+            bool left = diff_tree_subtree_holds_var(node->left, var);
+            bool right = diff_tree_subtree_holds_var(node->right, var);
 
             if(left && right) {
                 DiffTreeNode* exp_f_1 = MUL_(cR, LOG_(cL));
@@ -250,7 +256,7 @@ static DiffTreeNode* diff_tree_differentiate_num_(ATTR_UNUSED DiffTree* dtree, A
     return CONST_(0);
 }
 
-DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0, size_t n)
+DiffTreeNode* diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0, size_t n)
 {
     utils_assert(dtree);
     utils_assert(var);
@@ -260,36 +266,32 @@ DiffTreeErr diff_tree_taylor_expansion(DiffTree* dtree, Variable* var, double x0
     diff_tree_set_latex_dump_enabled(false);
     diff_tree_dump_begin_math();
     
-
     var->val = x0;
 
     double f = diff_tree_evaluate_tree(dtree);
-    DiffTreeNode* term = CONST_(f);
-    diff_tree_dump_node_latex(dtree, term);
-    diff_tree_mark_to_delete(dtree, term);
+    DiffTreeNode* polynom = CONST_(f);
 
     for(size_t k = 1; k <= n; ++k) {
-        diff_tree_dump_latex("+");
-
         diff_tree_differentiate_tree_n(dtree, var, 1);
 
         double derivative = diff_tree_evaluate_tree(dtree);
         double k_fact = (double)utils_i64_factorial(k);
-        term = MUL_(
+        diff_tree_mark_to_delete(dtree, polynom);
+
+        polynom = ADD_(diff_tree_copy_subtree(dtree, polynom, NULL), MUL_(
             DIV_(CONST_(derivative), CONST_(k_fact)), 
             POW_(SUB_(VAR_(var), CONST_(x0)), CONST_((double)k))
-        );
-        
-        diff_tree_dump_node_latex(dtree, term);
-        diff_tree_mark_to_delete(dtree, term);
+        ));
     }
+
+    diff_tree_dump_node_latex(dtree, polynom);
 
     diff_tree_dump_latex("+o((x-%g)^%lu)", x0, n);
 
     diff_tree_dump_end_math();
     diff_tree_set_latex_dump_enabled(true);
 
-    return DIFF_TREE_ERR_NONE;
+    return polynom;
 }
 
 #undef dR
@@ -443,22 +445,22 @@ double diff_tree_evaluate_op(DiffTree* dtree, DiffTreeNode* node)
 #undef CHECK_MATH_ERR_AND_RET
 
 
-bool diff_tree_subtree_holds_var(DiffTreeNode* node)
+bool diff_tree_subtree_holds_var(DiffTreeNode* node, Variable* var)
 {
     utils_assert(node);
     bool ret = false;
 
     if(node->right) {
-        ret = diff_tree_subtree_holds_var(node->right);
+        ret = diff_tree_subtree_holds_var(node->right, var);
         if(ret) return true;
     }
 
     if(node->left) {
-        ret = diff_tree_subtree_holds_var(node->left);
+        ret = diff_tree_subtree_holds_var(node->left, var);
         if(ret) return true;
     }
 
-    if(node->type == NODE_TYPE_VAR)
+    if(node->type == NODE_TYPE_VAR && node->value.var_hash == var->hash)
         return true;
     
     return false;

@@ -31,14 +31,14 @@ INCLUDE_DIRS_ALL = $(INCLUDE_DIRS) $(LIBCUTILS_INCLUDE_DIR)
 # COMPILER CONFIG
 CC := g++
 
-CPPFLAGS_DEBUG := -D _DEBUG -ggdb3 -O0
+CPPFLAGS_DEBUG := -D _DEBUG -ggdb3 -O0 -g
 
 CPPFLAGS_RELEASE := -O2 -march=native
 
 CPPFLAGS_ASAN := -fcheck-new -fsized-deallocation -fstack-protector -fstrict-overflow -flto-odr-type-merging -fno-omit-frame-pointer -pie -fPIE -fsanitize=address,alignment,bool,bounds,enum,float-cast-overflow,float-divide-by-zero,integer-divide-by-zero,leak,nonnull-attribute,null,object-size,return,returns-nonnull-attribute,shift,signed-integer-overflow,undefined,unreachable,vla-bound,vptr
 
 ifeq "$(TARGET)" "Release"
-CPPFLAGS_TARGET := $(CPPFLAGS_RELEASE) $(CPPFLAGS_ASAN) -ggdb3
+CPPFLAGS_TARGET := $(CPPFLAGS_RELEASE)
 else
 CPPFLAGS_TARGET := $(CPPFLAGS_DEBUG) $(CPPFLAGS_ASAN)
 endif
@@ -58,11 +58,11 @@ $(BUILD_DIR)/$(EXECUTABLE): $(OBJS)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo Building $@...
 	@mkdir -p $(BUILD_DIR)
-	@$(CC) $(CPPFLAGS) -c -o $@ $< $(LIBS)
+	$(CC) $(CPPFLAGS) -c -o $@ $< $(LIBS)
 
 .PHONY: run
 run: $(BUILD_DIR)/$(EXECUTABLE)
-	./$< --log=log.html --in=input.txt --out=output.tex
+	./$< --log=log.html --in=input.txt --out=output.tex --power=4 --x0=0 --ymin=-3 --ymax=3
 	latexmk -pdf -auxdir=build/latex output.tex
 
 .PHONY: clean

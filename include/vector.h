@@ -65,6 +65,8 @@ struct Vector
 
 };
 
+VectorErr vector_copy_from(Vector* from, Vector* to);
+
 VectorErr vector_ctor(Vector* vec, size_t capacity, size_t tsize);
 
 VectorErr vector_push(Vector* vec, void* val);

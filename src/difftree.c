@@ -1,5 +1,6 @@
 #include "difftree.h"
 
+#include <cmath>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -11,6 +12,7 @@
 #include "difftree_math.h"
 #include "hashutils.h"
 #include "logutils.h"
+#include "mathutils.h"
 #include "memutils.h"
 #include "ioutils.h"
 #include "assertutils.h"
@@ -61,10 +63,6 @@ ATTR_UNUSED static void diff_tree_print_node_ptr_(FILE* file, void* ptr);
 
 static bool diff_tree_node_need_parentheses_(DiffTreeNode* node);
 
-static DiffTreeErr diff_tree_init_latex_file_(const char* filename);
-
-static void diff_tree_end_latex_file_();
-
 // PARSING //
 
 DiffTreeNode* diff_tree_parse_get_general_(DiffTree* dtree);
@@ -96,21 +94,29 @@ DiffTreeErr diff_tree_verify_(DiffTree* diff_tree);
 
 #define DEFAULT_VAR_VECTOR_CAPACITY       10
 #define DEFAULT_TO_DELETE_VECTOR_CAPACITY 10
-#define DEFAULT_NODES_VECTOR_CAPACITY     10
 
-DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
+DiffTreeErr diff_tree_ctor(DiffTree* diff_tree)
 {
     utils_assert(diff_tree);
 
-    DiffTreeErr err = DIFF_TREE_ERR_NONE;
-
     diff_tree->size = 0;
     
-    err = diff_tree_init_latex_file_(latex_filename);
-    err == DIFF_TREE_ERR_NONE verified(return err);
-
     vector_ctor(&diff_tree->vars, DEFAULT_VAR_VECTOR_CAPACITY, sizeof(Variable));
     vector_ctor(&diff_tree->to_delete, DEFAULT_TO_DELETE_VECTOR_CAPACITY, sizeof(DiffTreeNode*));
+
+    return DIFF_TREE_ERR_NONE;
+}
+
+DiffTreeErr diff_tree_copy_tree(DiffTree* from, DiffTree* to)
+{
+    to->size = from->size;
+    to->root = diff_tree_copy_subtree(from, from->root, NULL);
+
+    vector_ctor(&to->vars, DEFAULT_VAR_VECTOR_CAPACITY, sizeof(Variable));
+    vector_ctor(&to->to_delete, DEFAULT_TO_DELETE_VECTOR_CAPACITY, sizeof(DiffTreeNode*));
+
+    for(size_t i = 0; i < from->vars.size; ++i)
+        vector_push(&to->vars, vector_at(&from->vars, i));
 
     return DIFF_TREE_ERR_NONE;
 }
@@ -118,8 +124,6 @@ DiffTreeErr diff_tree_ctor(DiffTree* diff_tree, const char* latex_filename)
 void diff_tree_dtor(DiffTree* diff_tree)
 {
     utils_assert(diff_tree);
-
-    diff_tree_end_latex_file_();
 
     diff_tree_free_subtree(diff_tree->root); 
 
@@ -374,11 +378,6 @@ DiffTreeNode* diff_tree_parse_get_expr_(DiffTree* dtree)
         diff_tree_mark_to_delete(dtree, node);
     }
 
-    // if(pos_prev == POS_) {
-    //     UTILS_LOGE(LOG_CTG_DIFF_TREE, "syntax err on %ld", POS_);
-    //     return NULL;
-    // }
-
     return node;
 }
 
@@ -410,7 +409,6 @@ DiffTreeNode* diff_tree_parse_get_pow_(DiffTree* dtree)
 
     DiffTreeNode* node = diff_tree_parse_get_primary_(dtree);
     
-    ssize_t pos_prev = POS_;
     while(BUF_AT_POS_ == '^') {
 
         INCREMENT_POS_;
@@ -419,11 +417,6 @@ DiffTreeNode* diff_tree_parse_get_pow_(DiffTree* dtree)
         node = POW_(node, node_new);
         diff_tree_mark_to_delete(dtree, node);
     }
-    
-    // if(pos_prev == POS_) {
-    //     UTILS_LOGE(LOG_CTG_DIFF_TREE, "syntax err on %ld", POS_);
-    //     return NULL;
-    // }
 
     return node;
 }
@@ -670,7 +663,7 @@ static const char* phrases[] = {
     "Это утверждение предствляет собой переформулировку предложения 5.3.18, которое непосредтвенно вытекает из теоремы 7.2.134"
 };
 
-static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
+DiffTreeErr diff_tree_init_latex_file(const char* filename)
 {
     file_tex = open_file(filename, "w");
     file_tex verified(return DIFF_TREE_IO_ERR);
@@ -697,7 +690,7 @@ static DiffTreeErr diff_tree_init_latex_file_(const char* filename)
     return DIFF_TREE_ERR_NONE;
 }
 
-static void diff_tree_end_latex_file_()
+void diff_tree_end_latex_file()
 {
     utils_assert(file_tex);
 
@@ -803,13 +796,86 @@ void diff_tree_dump_end_math()
     diff_tree_dump_latex("\\end{dmath}\n\n");
 }
 
+void diff_tree_dump_taylor_graph_latex(DiffTree* dtree, DiffTreeNode* taylor, double x_begin, double x_end, double x_step, double y_min, double y_max)
+{
+    fprintf(file_tex,
+        "\\begin{figure}[h]\n"
+        "\\centering\n"
+        "\\begin{tikzpicture}\n"
+        "\\begin{axis}[\n"
+            "xlabel={x},\n"
+            "ylabel={y},\n"
+            "width=0.5\\textwidth,\n"
+            "height=0.4\\textwidth,\n"
+            "grid=major,\n"
+            "ymin=%f,\n"
+            "ymax=%f,\n"
+        "]\n\n"
+        "\\addplot[\n"
+        "    mark size=0pt,\n"
+        "    color=blue\n"
+        "] coordinates {\n",
+        y_min, y_max);
+
+    for(double x = x_begin; x < x_end; x += 0.01) {
+        ((Variable*)vector_at(&dtree->vars, 0))->val = x;
+        double val = diff_tree_evaluate_tree(dtree);
+        fprintf(file_tex, "(%.2f,%.2f)\n", x, val);
+    }
+
+    fprintf(file_tex, 
+        "};\n \\addlegendentry{$f(x)$}\n");
+
+    fprintf(file_tex,
+        "\\addplot[\n"
+        "    mark size=0pt,\n"
+        "    color=red\n"
+        "] coordinates {\n");
+
+    double x_min = INFINITY, x_max = 0;
+    for(double x = x_begin; x <= x_end; x += 0.005) {
+        ((Variable*)vector_at(&dtree->vars, 0))->val = x;
+        double val = diff_tree_evaluate(dtree, taylor);
+        if(val < y_max && val > y_min)
+        {
+            x_min = x < x_min ? x : x_min;
+            x_max = x > x_max ? x : x_max;
+        }
+        // fprintf(file_tex, "(%.2f,%.2f)\n", x, val);
+    }
+
+    for(double x = x_min; x < x_max; x += 0.01) {
+        ((Variable*)vector_at(&dtree->vars, 0))->val = x;
+        double val = diff_tree_evaluate(dtree, taylor);
+        if(val < y_max && val > y_min)
+        {
+            x_min = x < x_min ? x : x_min;
+            x_max = x > x_max ? x : x_max;
+        }
+        fprintf(file_tex, "(%f,%f)\n", x, val);
+    }
+
+    fprintf(file_tex, 
+        "};\n \\addlegendentry{$P(x)$}\n");
+
+    fprintf(file_tex, 
+        "\\end{axis}\n"
+        "\\end{tikzpicture}\n"
+        "\\caption{Сравнительный график функции и многочлена Тейлора}\n"
+        "\\end{figure}\n");
+}
+
 void diff_tree_dump_graph_latex(DiffTree* dtree, double x_begin, double x_end, double x_step)
 {
     fprintf(file_tex,
+        "\\begin{figure}[h]\n"
+        "\\centering\n"
         "\\begin{tikzpicture}\n"
         "\\begin{axis}[\n"
-            "xlabel={X},\n"
-            "ylabel={Y},\n"
+            "xlabel={x},\n"
+            "ylabel={y},\n"
+            "width=0.5\\textwidth,\n"
+            "height=0.4\\textwidth,\n"
             "grid=major,\n"
             "legend pos=north west\n"
         "]\n\n"
@@ -825,9 +891,13 @@ void diff_tree_dump_graph_latex(DiffTree* dtree, double x_begin, double x_end, d
     }
 
     fprintf(file_tex, 
-        "};\n"
+        "};\n \\addlegendentry{$\\frac{df}{dx}$}\n");
+
+    fprintf(file_tex, 
         "\\end{axis}\n"
-        "\\end{tikzpicture}\n");
+        "\\end{tikzpicture}\n"
+        "\\caption{График производной}\n"
+        "\\end{figure}\n");
 
 }
 

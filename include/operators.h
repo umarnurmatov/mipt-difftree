@@ -50,7 +50,7 @@ static Operator op_arr[] =
     MAKE_OPERATOR("^"     , "{"         , "}^{"       , "}"  , OPERATOR_TYPE_POW  , OPERATOR_ARGNUM_2 , OPERATOR_PRECEDANCE_3),
     MAKE_OPERATOR("exp"   , "e^{"       , ""          , "}"  , OPERATOR_TYPE_EXP  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
     MAKE_OPERATOR("sqrt"  , "\\sqrt{"   , ""          , "}"  , OPERATOR_TYPE_SQRT , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
-    MAKE_OPERATOR("log"   , "\\log{"    , ""          , "}"  , OPERATOR_TYPE_LOG  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
+    MAKE_OPERATOR("ln"    , "\\ln{"     , ""          , "}"  , OPERATOR_TYPE_LOG  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
     MAKE_OPERATOR("sin"   , "\\sin{"    , ""          , "}"  , OPERATOR_TYPE_SIN  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
     MAKE_OPERATOR("cos"   , "\\cos{"    , ""          , "}"  , OPERATOR_TYPE_COS  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
     MAKE_OPERATOR("tan"   , "\\tg{"     , ""          , "}"  , OPERATOR_TYPE_TAN  , OPERATOR_ARGNUM_1 , OPERATOR_PRECEDANCE_4),
