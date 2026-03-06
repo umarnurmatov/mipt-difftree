@@ -10,18 +10,17 @@
 This program accepts a .txt file with a function as input and 
 outputs latex file. 
 
-Capatabilities:
+### Capatabilities
 - calculating function derivate (verbose, step-by-step)
 - expanding into Taylor series
 - plotting
 
 ### Example
+Example `.pdf` output can to be found in `./example/` folder.
 
-![Derivative](res/img/derivative.png)
-![Derivative plot](res/img/derivative_plot.png)
-![Taylor plot](res/img/taylor_plot.png)
-
-Examples are to be found in `./example/` folder.
+<img src="res/img/derivative.png" width="600"> 
+<img src="res/img/derivative_plot.png" width="600"> 
+<img src="res/img/taylor_plot.png" width="600"> 
 
 ## Input
 
